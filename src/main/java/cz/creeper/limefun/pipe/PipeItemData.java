@@ -64,6 +64,11 @@ public class PipeItemData extends AbstractData<PipeItemData, ImmutablePipeItemDa
         registerFieldSetter(LimeFunKeys.PIPE_EXITING_DIRECTION, this::setExitingDirection);
         registerFieldSetter(LimeFunKeys.PIPE_DISTANCE_TRAVELLED, this::setDistanceTravelled);
         registerFieldSetter(LimeFunKeys.PIPE_ARMOR_STAND_ID, this::setArmorStandId);
+
+        registerKeyValue(LimeFunKeys.PIPE_ENTERING_DIRECTION, this::enteringDirection);
+        registerKeyValue(LimeFunKeys.PIPE_EXITING_DIRECTION, this::exitingDirection);
+        registerKeyValue(LimeFunKeys.PIPE_DISTANCE_TRAVELLED, this::distanceTravelled);
+        registerKeyValue(LimeFunKeys.PIPE_ARMOR_STAND_ID, this::armorStandId);
     }
 
     @Override
