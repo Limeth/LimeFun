@@ -43,6 +43,7 @@ public class PipeItem {
 
     public static PipeItem create(PipeSystem system, BlockLoc<World> pipe, Item item, Direction enteringDirection, double distanceTravelledInCurrentPipe) {
         Util.setItemDisplayOnly(item, true);
+        item.offer(new PipeItemData());
         item.offer(item.getValue(LimeFunKeys.PIPE_ENTERING_DIRECTION).get().set(enteringDirection));
         item.offer(item.getValue(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get().set(distanceTravelledInCurrentPipe));
 

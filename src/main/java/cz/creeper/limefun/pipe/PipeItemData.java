@@ -1,10 +1,7 @@
 package cz.creeper.limefun.pipe;
 
 import cz.creeper.limefun.LimeFunKeys;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.ToString;
+import lombok.*;
 import org.apache.commons.lang3.NotImplementedException;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.data.DataContainer;
@@ -22,13 +19,13 @@ import java.util.UUID;
  */
 @ToString
 public class PipeItemData extends AbstractData<PipeItemData, ImmutablePipeItemData> {
-    @Getter(AccessLevel.PRIVATE) @Setter(AccessLevel.PRIVATE) private Direction enteringDirection;
-    @Getter(AccessLevel.PRIVATE) @Setter(AccessLevel.PRIVATE) private Direction exitingDirection;
-    @Getter(AccessLevel.PRIVATE) @Setter(AccessLevel.PRIVATE) private double distanceTravelled;
-    @Getter(AccessLevel.PRIVATE) @Setter(AccessLevel.PRIVATE) private UUID armorStandId;
+    @NonNull @Getter(AccessLevel.PRIVATE) @Setter(AccessLevel.PRIVATE) private Direction enteringDirection;
+    @NonNull @Getter(AccessLevel.PRIVATE) @Setter(AccessLevel.PRIVATE) private Direction exitingDirection;
+    @NonNull @Getter(AccessLevel.PRIVATE) @Setter(AccessLevel.PRIVATE) private double distanceTravelled;
+    @NonNull @Getter(AccessLevel.PRIVATE) @Setter(AccessLevel.PRIVATE) private UUID armorStandId;
 
     public PipeItemData() {
-        this(null, null, 0.0, null);
+        this(Direction.NORTH, Direction.NORTH, 0.0, new UUID(0, 0));
     }
 
     public PipeItemData(Direction enteringDirection, Direction exitingDirection,
