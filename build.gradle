@@ -1,0 +1,22 @@
+plugins {
+    id 'org.spongepowered.plugin' version '0.7'
+    id 'java'
+}
+
+group = pluginGroup
+version = pluginVersion
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'sponge'
+        url = 'http://repo.spongepowered.org/maven'
+    }
+}
+
+dependencies {
+    compile 'org.spongepowered:spongeapi:5.1.0-20161023.181826-1'
+    compileOnly "org.projectlombok:lombok:1.16.10"
+}
+
+sponge.plugin.id = pluginId
