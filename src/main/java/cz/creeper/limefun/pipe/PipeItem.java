@@ -3,6 +3,7 @@ package cz.creeper.limefun.pipe;
 import com.flowpowered.math.vector.Vector3d;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import cz.creeper.limefun.LimeFunKeys;
 import cz.creeper.limefun.util.BlockLoc;
 import cz.creeper.limefun.util.Util;
 import lombok.*;
@@ -40,8 +41,10 @@ public class PipeItem {
     @NonNull @Setter private ArmorStand armorStand;
     @NonNull @Setter private DyeColor pipeColor;
 
-    public static PipeItem create(PipeSystem system, BlockLoc<World> pipe, Item item, PipeItemData data) {
+    public static PipeItem create(PipeSystem system, BlockLoc<World> pipe, Item item, Direction enteringDirection, double distanceTravelledInCurrentPipe) {
         Util.setItemDisplayOnly(item, true);
+        item.offer(item.getValue(LimeFunKeys.PIPE_ENTERING_DIRECTION).get().set(enteringDirection));
+        item.offer(item.getValue(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get().set(distanceTravelledInCurrentPipe));
 
         DyeColor pipeColor = getStainedGlassColor(pipe);
         Location itemLocation = item.getLocation();
@@ -76,8 +79,8 @@ public class PipeItem {
     }
 
     public void chooseExitingDirection() {
-        data.set(data.exitingDirection().set(
-                chooseExitingDirection(pipe, data.enteringDirection().get(), pipeColor, system.getPlugin().getRandom())
+        item.offer(item.getValue(LimeFunKeys.PIPE_EXITING_DIRECTION).get().set(
+                chooseExitingDirection(pipe, item.get(LimeFunKeys.PIPE_ENTERING_DIRECTION).get(), pipeColor, system.getPlugin().getRandom())
         ));
     }
 
@@ -139,13 +142,15 @@ public class PipeItem {
      */
     public boolean enterBlock() {
         Location<World> location = pipe.getLocation();
-        Location<World> enteringLocation = location.getBlockRelative(data.exitingDirection().get());
+        Location<World> enteringLocation = location.getBlockRelative(item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get());
         BlockLoc<World> enteringBlock = new BlockLoc<>(enteringLocation);
         BlockType type = enteringLocation.getBlockType();
 
         if(type == BlockTypes.STAINED_GLASS) {
             setPipe(enteringBlock);
-            data.enteringDirection().set(data.exitingDirection().get());
+            item.offer(item.getValue(LimeFunKeys.PIPE_ENTERING_DIRECTION).get().set(
+                    item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get()
+            ));
             chooseExitingDirection();
             return true;
         }
@@ -177,7 +182,7 @@ public class PipeItem {
                 unregisterAndDespawn();
 
                 for(ItemStackSnapshot snapshot : returnedItems) {
-                    system.createAndRegister(snapshot, exitingLocation, pipe, data.exitingDirection().get().getOpposite(), 0.0);
+                    system.createAndRegister(snapshot, exitingLocation, pipe, item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get().getOpposite(), 0.0);
                 }
 
                 return true;
@@ -185,21 +190,22 @@ public class PipeItem {
         }
 
         // Else, bounce back
-        data.enteringDirection().set(data.exitingDirection().get().getOpposite());
+        item.offer(item.getValue(LimeFunKeys.PIPE_ENTERING_DIRECTION).get().set(item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get().getOpposite()));
         chooseExitingDirection();
 
         return true;
     }
 
     public void tick() {
-        data.distanceTravelled().set(data.distanceTravelled().getDefault() + system.getSpeed());
+        item.offer(item.getValue(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get().transform((distanceTravelled) -> distanceTravelled + system.getSpeed()));
         double maxTravelDistance;
         boolean updateLocation = true;
 
-        while(data.distanceTravelled().get()
-              >= (maxTravelDistance = getTravelDistance(data.enteringDirection().get(), data.exitingDirection().get()))) {
-            data.distanceTravelled().set()
-            distanceTravelledInCurrentPipe -= maxTravelDistance;
+        while(item.get(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get()
+              >= (maxTravelDistance = getTravelDistance(item.get(LimeFunKeys.PIPE_ENTERING_DIRECTION).get(),
+                                                        item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get()))) {
+            final double maxTravelDistanceFinal = maxTravelDistance;
+            item.offer(item.getValue(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get().transform((distanceTravelled) -> distanceTravelled - maxTravelDistanceFinal));
             updateLocation = enterBlock();
         }
 
@@ -208,7 +214,10 @@ public class PipeItem {
     }
 
     private void updateDisplayLocation() {
-        armorStand.setLocation(getDisplayLocation(pipe, enteringDirection, exitingDirection, distanceTravelledInCurrentPipe));
+        armorStand.setLocation(getDisplayLocation(pipe,
+                                                  item.get(LimeFunKeys.PIPE_ENTERING_DIRECTION).get(),
+                                                  item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get(),
+                                                  item.get(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get()));
     }
 
     /*
@@ -262,7 +271,7 @@ public class PipeItem {
     }
 
     public void unregisterAndDrop() {
-        distanceTravelledInCurrentPipe = 0.0;
+        item.offer(item.getValue(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get().set(0.0));
         system.unregisterItem(this);
         item.setVehicle(null);
         armorStand.remove();
@@ -291,7 +300,7 @@ public class PipeItem {
     }
 
     public Location<World> getEnteringLocation() {
-        return getEnteringLocation(enteringDirection, pipe);
+        return getEnteringLocation(item.get(LimeFunKeys.PIPE_ENTERING_DIRECTION).get(), pipe);
     }
 
     public <E extends Extent> Location<E> getExitingLocation(Direction exitingDirection, BlockLoc<E> pipe) {
@@ -300,14 +309,14 @@ public class PipeItem {
     }
 
     public Location<World> getExitingLocation() {
-        return getExitingLocation(exitingDirection, pipe);
+        return getExitingLocation(item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get(), pipe);
     }
 
     public Location<World> getDroppingLocation() {
-        return getExitingLocation().add(exitingDirection.asOffset().div(8));
+        return getExitingLocation().add(item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get().asOffset().div(8));
     }
 
     public Vector3d getDroppingVelocity() {
-        return exitingDirection.asOffset().mul(system.getSpeed());
+        return item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get().asOffset().mul(system.getSpeed());
     }
 }
