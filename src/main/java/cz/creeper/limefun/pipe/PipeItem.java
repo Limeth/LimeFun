@@ -80,9 +80,7 @@ public class PipeItem {
     }
 
     public void chooseExitingDirection() {
-        item.offer(item.getValue(LimeFunKeys.PIPE_EXITING_DIRECTION).get().set(
-                chooseExitingDirection(pipe, item.get(LimeFunKeys.PIPE_ENTERING_DIRECTION).get(), pipeColor, system.getPlugin().getRandom())
-        ));
+        item.offer(LimeFunKeys.PIPE_EXITING_DIRECTION, chooseExitingDirection(pipe, item.get(LimeFunKeys.PIPE_ENTERING_DIRECTION).get(), pipeColor, system.getPlugin().getRandom()));
     }
 
     public static <E extends Extent> Direction chooseExitingDirection(BlockLoc<E> pipe, Direction enteringDirection,
