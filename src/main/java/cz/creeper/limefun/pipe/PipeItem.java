@@ -11,6 +11,7 @@ import org.spongepowered.api.block.BlockType;
 import org.spongepowered.api.block.BlockTypes;
 import org.spongepowered.api.block.tileentity.TileEntity;
 import org.spongepowered.api.block.tileentity.carrier.TileEntityCarrier;
+import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.data.manipulator.mutable.DyeableData;
 import org.spongepowered.api.data.type.DyeColor;
 import org.spongepowered.api.entity.EntityTypes;
@@ -44,19 +45,17 @@ public class PipeItem {
     public static PipeItem create(PipeSystem system, BlockLoc<World> pipe, Item item, Direction enteringDirection, double distanceTravelledInCurrentPipe) {
         Util.setItemDisplayOnly(item, true);
         item.offer(new PipeItemData());
-        item.offer(item.getValue(LimeFunKeys.PIPE_ENTERING_DIRECTION).get().set(enteringDirection));
-        item.offer(item.getValue(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get().set(distanceTravelledInCurrentPipe));
+        item.offer(LimeFunKeys.PIPE_ENTERING_DIRECTION, enteringDirection);
+        item.offer(LimeFunKeys.PIPE_DISTANCE_TRAVELLED, distanceTravelledInCurrentPipe);
 
         DyeColor pipeColor = getStainedGlassColor(pipe);
         Location itemLocation = item.getLocation();
         Extent extent = itemLocation.getExtent();
         ArmorStand armorStand = (ArmorStand) extent.createEntity(EntityTypes.ARMOR_STAND, itemLocation.getPosition());
-        armorStand.offer(armorStand.small().set(true));
-        armorStand.offer(armorStand.gravity().set(false));
-        armorStand.offer(armorStand.marker().set(true));
-        /*armorStand.offer(armorStand.getValue(Keys.INVISIBLE)
-                .orElseThrow(() -> new IllegalStateException("Cannot edit armor stand visibility."))
-                .set(true));*/
+        armorStand.offer(Keys.ARMOR_STAND_IS_SMALL, true);
+        armorStand.offer(Keys.HAS_GRAVITY, false);
+        armorStand.offer(Keys.ARMOR_STAND_MARKER, true);
+        //armorStand.offer(Keys.INVISIBLE, true);
         PipeItem pipeItem = new PipeItem(system, pipe, item, armorStand, pipeColor);
 
         pipeItem.chooseExitingDirection();
@@ -147,9 +146,7 @@ public class PipeItem {
 
         if(type == BlockTypes.STAINED_GLASS) {
             setPipe(enteringBlock);
-            item.offer(item.getValue(LimeFunKeys.PIPE_ENTERING_DIRECTION).get().set(
-                    item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get()
-            ));
+            item.offer(LimeFunKeys.PIPE_ENTERING_DIRECTION, item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get());
             chooseExitingDirection();
             return true;
         }
@@ -189,14 +186,14 @@ public class PipeItem {
         }
 
         // Else, bounce back
-        item.offer(item.getValue(LimeFunKeys.PIPE_ENTERING_DIRECTION).get().set(item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get().getOpposite()));
+        item.offer(LimeFunKeys.PIPE_ENTERING_DIRECTION, item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get().getOpposite());
         chooseExitingDirection();
 
         return true;
     }
 
     public void tick() {
-        item.offer(item.getValue(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get().transform((distanceTravelled) -> distanceTravelled + system.getSpeed()));
+        item.offer(LimeFunKeys.PIPE_DISTANCE_TRAVELLED, item.get(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get() + system.getSpeed());
         double maxTravelDistance;
         boolean updateLocation = true;
 
@@ -204,7 +201,7 @@ public class PipeItem {
               >= (maxTravelDistance = getTravelDistance(item.get(LimeFunKeys.PIPE_ENTERING_DIRECTION).get(),
                                                         item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get()))) {
             final double maxTravelDistanceFinal = maxTravelDistance;
-            item.offer(item.getValue(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get().transform((distanceTravelled) -> distanceTravelled - maxTravelDistanceFinal));
+            item.offer(LimeFunKeys.PIPE_DISTANCE_TRAVELLED, item.get(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get() - maxTravelDistanceFinal);
             updateLocation = enterBlock();
         }
 
@@ -270,7 +267,7 @@ public class PipeItem {
     }
 
     public void unregisterAndDrop() {
-        item.offer(item.getValue(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get().set(0.0));
+        item.offer(LimeFunKeys.PIPE_DISTANCE_TRAVELLED, 0.0);
         system.unregisterItem(this);
         item.setVehicle(null);
         armorStand.remove();
