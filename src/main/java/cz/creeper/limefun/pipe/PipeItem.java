@@ -14,6 +14,7 @@ import org.spongepowered.api.block.tileentity.carrier.TileEntityCarrier;
 import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.data.manipulator.mutable.DyeableData;
 import org.spongepowered.api.data.type.DyeColor;
+import org.spongepowered.api.entity.Entity;
 import org.spongepowered.api.entity.EntityTypes;
 import org.spongepowered.api.entity.Item;
 import org.spongepowered.api.entity.living.ArmorStand;
@@ -67,6 +68,20 @@ public class PipeItem {
         armorStand.addPassenger(item);
 
         return pipeItem;
+    }
+
+    public static PipeItem load(PipeSystem system, Item item) {
+        Preconditions.checkArgument(item.get(PipeItemData.class).isPresent(),
+                                    "Cannot load a PipeItem from an Item that is missing PipeItemData.");
+        Location<World> location = item.getLocation();
+        BlockLoc<World> blockLoc = new BlockLoc<>(location);
+        World world = location.getExtent();
+        Entity entity = world.getEntity(item.get(LimeFunKeys.PIPE_ARMOR_STAND_ID).get())
+                .orElseThrow(() -> new IllegalStateException("The armor stand UUID belongs to an entity which is not an armor stand."));
+        ArmorStand armorStand = (ArmorStand) entity;
+        DyeColor pipeColor = getStainedGlassColor(blockLoc);
+
+        return new PipeItem(system, blockLoc, item, armorStand, pipeColor);
     }
 
     public static <E extends Extent> DyeColor getStainedGlassColor(BlockLoc<E> block) {
@@ -215,24 +230,6 @@ public class PipeItem {
                                                   item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get(),
                                                   item.get(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get()));
     }
-
-    /*
-    private void updateAndSaveArmorStand() {
-        updateArmorStand(armorStand, pipe, enteringDirection, exitingDirection, distanceTravelled);
-        save();
-    }
-
-    private static void updateArmorStand(ArmorStand armorStand, BlockLoc<World> pipe, Direction enteringDirection, Direction exitingDirection, double distanceTravelled) {
-        armorStand.setLocation(getDisplayLocation(pipe, enteringDirection, exitingDirection, distanceTravelled));
-    }
-
-    public void save() {
-        BodyPartRotationalData data = armorStand.getBodyPartRotationalData();
-        armorStand.offer(data.leftArmDirection().set(enteringDirection.asOffset()));
-        armorStand.offer(data.rightArmDirection().set(exitingDirection.asOffset()));
-        armorStand.offer(data.)
-    }
-    */
 
     private static <E extends Extent> Location<E> getDisplayLocation(BlockLoc<E> pipe, Direction enteringDirection, Direction exitingDirection, double distanceTravelledInCurrentPipe) {
         Preconditions.checkArgument(!enteringDirection.isOpposite(exitingDirection),

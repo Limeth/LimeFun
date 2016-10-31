@@ -14,8 +14,10 @@ import org.spongepowered.api.entity.Entity;
 import org.spongepowered.api.entity.EntityTypes;
 import org.spongepowered.api.entity.Item;
 import org.spongepowered.api.event.Listener;
+import org.spongepowered.api.event.block.ChangeBlockEvent;
 import org.spongepowered.api.event.cause.Cause;
 import org.spongepowered.api.event.cause.entity.spawn.BlockSpawnCause;
+import org.spongepowered.api.event.cause.entity.spawn.SpawnCause;
 import org.spongepowered.api.event.cause.entity.spawn.SpawnTypes;
 import org.spongepowered.api.event.entity.SpawnEntityEvent;
 import org.spongepowered.api.event.entity.item.ItemMergeItemEvent;
@@ -88,10 +90,22 @@ public class PipeSystem {
      * Creates a {@link PipeItem} and registers it in the system.
      */
     public PipeItem registerItem(Item item, BlockLoc<World> pipe, Direction enteringDirection, double distanceTravelledInCurrentPipe) {
-        PipeItem pipeItem = PipeItem.create(this, pipe, item, enteringDirection, distanceTravelledInCurrentPipe);
+        return registerItem(PipeItem.create(this, pipe, item, enteringDirection, distanceTravelledInCurrentPipe));
+    }
 
-        uuidToItems.put(item.getUniqueId(), pipeItem);
-        blockToItems.put(pipe, pipeItem);
+    /**
+     * Loads a {@link PipeItem} and registers it in the system.
+     */
+    public PipeItem loadItem(Item item) {
+        return registerItem(PipeItem.load(this, item));
+    }
+
+    /**
+     * Registers a {@link PipeItem} in the system.
+     */
+    public PipeItem registerItem(PipeItem pipeItem) {
+        uuidToItems.put(pipeItem.getItem().getUniqueId(), pipeItem);
+        blockToItems.put(pipeItem.getPipe(), pipeItem);
 
         return pipeItem;
     }
@@ -119,48 +133,78 @@ public class PipeSystem {
     }
 
     @Listener
+    public void onChangeBlock(ChangeBlockEvent event) {
+        // TODO
+    }
+
+    @Listener
     public void onSpawnEntity(SpawnEntityEvent event) {
         Cause cause = event.getCause();
 
-        cause.first(BlockSpawnCause.class).ifPresent((blockSpawnCause) -> {
-            if(blockSpawnCause.getType() == SpawnTypes.DISPENSE) {
-                BlockSnapshot dropper = blockSpawnCause.getBlockSnapshot();
-                BlockState dropperState = dropper.getState();
+        cause.first(SpawnCause.class).filter((spawnCause) -> spawnCause.getType() == SpawnTypes.CHUNK_LOAD)
+                .ifPresent((spawnCause) -> {
+            for(Entity entity : event.getEntities()) {
+                if(!(entity instanceof Item))
+                    continue;
 
-                if(dropperState.getType() == BlockTypes.DROPPER) {
-                    Location<World> dropperLocation = dropper.getLocation()
-                            .orElseThrow(() -> new IllegalStateException("Weird, this dropper does not have a location. How did we get it in the first place?"));
-                    Direction dropperDirection = dropperState.get(Keys.DIRECTION)
-                            .orElseThrow(() -> new IllegalStateException("Odd, this dropper does not have a direction."));
-                    Location<World> pipeLocation = dropperLocation.add(dropperDirection.asBlockOffset());
+                Item item = (Item) entity;
 
-                    if(pipeLocation.getBlockType() != BlockTypes.STAINED_GLASS)
-                        return;
-
-                    Extent extent = dropperLocation.getExtent();
-                    Iterator<Entity> entities = event.getEntities().iterator();
-                    Entity droppedEntity = entities.next();
-                    System.out.println(droppedEntity.getLocation());
-
-                    if(entities.hasNext())
-                        throw new IllegalStateException("A dropper must only drop a single entity.");
-
-                    if(!(droppedEntity instanceof Item))
-                        throw new IllegalStateException("A dropper must always drop an item, dropped "
-                                + droppedEntity.getClass().getName() + " instead.");
-
-                    event.setCancelled(true);
-
-                    Item item = (Item) droppedEntity;
-                    boolean success = extent.spawnEntity(item, Cause.source(plugin).build());
-
-                    if(!success)
-                        throw new IllegalStateException("Could not spawn the item entity.");
-
-                    BlockLoc<World> pipeBlock = new BlockLoc<>(pipeLocation);
-
-                    registerItem(item, pipeBlock, dropperDirection, 0.2);
+                if(item.get(PipeItemData.class).isPresent()) {
+                    System.out.println(item);
+                    loadItem(item);
                 }
+
+                /*
+                if(!(entity instanceof ArmorStand))
+                    continue;
+
+                ArmorStand armorStand = (ArmorStand) entity;
+
+                armorStand.getPassengers().stream().filter(itemEntity -> itemEntity.get(PipeItemData.class).isPresent()).forEach(itemEntity -> {
+                    System.out.println(itemEntity);
+                    loadItem((Item) itemEntity);
+                });
+                */
+            }
+        });
+
+        cause.first(BlockSpawnCause.class).filter((blockSpawnCause -> blockSpawnCause.getType() == SpawnTypes.DISPENSE))
+                .ifPresent((blockSpawnCause) -> {
+            BlockSnapshot dropper = blockSpawnCause.getBlockSnapshot();
+            BlockState dropperState = dropper.getState();
+
+            if(dropperState.getType() == BlockTypes.DROPPER) {
+                Location<World> dropperLocation = dropper.getLocation()
+                        .orElseThrow(() -> new IllegalStateException("Weird, this dropper does not have a location. How did we get it in the first place?"));
+                Direction dropperDirection = dropperState.get(Keys.DIRECTION)
+                        .orElseThrow(() -> new IllegalStateException("Odd, this dropper does not have a direction."));
+                Location<World> pipeLocation = dropperLocation.add(dropperDirection.asBlockOffset());
+
+                if(pipeLocation.getBlockType() != BlockTypes.STAINED_GLASS)
+                    return;
+
+                Extent extent = dropperLocation.getExtent();
+                Iterator<Entity> entities = event.getEntities().iterator();
+                Entity droppedEntity = entities.next();
+
+                if(entities.hasNext())
+                    throw new IllegalStateException("A dropper must only drop a single entity.");
+
+                if(!(droppedEntity instanceof Item))
+                    throw new IllegalStateException("A dropper must always drop an item, dropped "
+                            + droppedEntity.getClass().getName() + " instead.");
+
+                event.setCancelled(true);
+
+                Item item = (Item) droppedEntity;
+                boolean success = extent.spawnEntity(item, Cause.source(plugin).build());
+
+                if(!success)
+                    throw new IllegalStateException("Could not spawn the item entity.");
+
+                BlockLoc<World> pipeBlock = new BlockLoc<>(pipeLocation);
+
+                registerItem(item, pipeBlock, dropperDirection, 0.2);
             }
         });
     }
