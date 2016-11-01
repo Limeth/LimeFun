@@ -21,7 +21,7 @@ import java.util.UUID;
 public class PipeItemData extends AbstractData<PipeItemData, ImmutablePipeItemData> {
     @NonNull @Getter(AccessLevel.PRIVATE) @Setter(AccessLevel.PRIVATE) private Direction enteringDirection;
     @NonNull @Getter(AccessLevel.PRIVATE) @Setter(AccessLevel.PRIVATE) private Direction exitingDirection;
-    @NonNull @Getter(AccessLevel.PRIVATE) @Setter(AccessLevel.PRIVATE) private double distanceTravelled;
+    @Getter(AccessLevel.PRIVATE) @Setter(AccessLevel.PRIVATE) private double distanceTravelled;
     @NonNull @Getter(AccessLevel.PRIVATE) @Setter(AccessLevel.PRIVATE) private UUID armorStandId;
 
     public PipeItemData() {

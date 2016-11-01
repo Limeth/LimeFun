@@ -17,8 +17,8 @@ import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.block.ChangeBlockEvent;
 import org.spongepowered.api.event.cause.Cause;
 import org.spongepowered.api.event.cause.entity.spawn.BlockSpawnCause;
-import org.spongepowered.api.event.cause.entity.spawn.SpawnCause;
 import org.spongepowered.api.event.cause.entity.spawn.SpawnTypes;
+import org.spongepowered.api.event.entity.ConstructEntityEvent;
 import org.spongepowered.api.event.entity.SpawnEntityEvent;
 import org.spongepowered.api.event.entity.item.ItemMergeItemEvent;
 import org.spongepowered.api.item.inventory.ItemStackSnapshot;
@@ -138,35 +138,23 @@ public class PipeSystem {
     }
 
     @Listener
+    public void onPostConstructEntity(ConstructEntityEvent.Post event) {
+        Entity entity = event.getTargetEntity();
+
+        if(!(entity instanceof Item))
+            return;
+
+        Item item = (Item) entity;
+
+        if(item.get(PipeItemData.class).isPresent()) {
+            System.out.println(item);  // TODO: this never fires. Why aren't you being loaded, PipeItemData?!
+            loadItem(item);
+        }
+    }
+
+    @Listener
     public void onSpawnEntity(SpawnEntityEvent event) {
         Cause cause = event.getCause();
-
-        cause.first(SpawnCause.class).filter((spawnCause) -> spawnCause.getType() == SpawnTypes.CHUNK_LOAD)
-                .ifPresent((spawnCause) -> {
-            for(Entity entity : event.getEntities()) {
-                if(!(entity instanceof Item))
-                    continue;
-
-                Item item = (Item) entity;
-
-                if(item.get(PipeItemData.class).isPresent()) {
-                    System.out.println(item);
-                    loadItem(item);
-                }
-
-                /*
-                if(!(entity instanceof ArmorStand))
-                    continue;
-
-                ArmorStand armorStand = (ArmorStand) entity;
-
-                armorStand.getPassengers().stream().filter(itemEntity -> itemEntity.get(PipeItemData.class).isPresent()).forEach(itemEntity -> {
-                    System.out.println(itemEntity);
-                    loadItem((Item) itemEntity);
-                });
-                */
-            }
-        });
 
         cause.first(BlockSpawnCause.class).filter((blockSpawnCause -> blockSpawnCause.getType() == SpawnTypes.DISPENSE))
                 .ifPresent((blockSpawnCause) -> {
