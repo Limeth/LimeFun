@@ -28,10 +28,7 @@ import org.spongepowered.api.world.Location;
 import org.spongepowered.api.world.World;
 import org.spongepowered.api.world.extent.Extent;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 
 @Getter
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -66,18 +63,23 @@ public class PipeItem {
             throw new IllegalStateException("Could not spawn the armor stand.");
 
         armorStand.addPassenger(item);
+        item.offer(LimeFunKeys.PIPE_ARMOR_STAND_ID, armorStand.getUniqueId());
 
         return pipeItem;
     }
 
-    public static PipeItem load(PipeSystem system, Item item) {
+    public static PipeItem load(PipeSystem system, Item item, Map<UUID, Entity> uuidEntityMap) {
         Preconditions.checkArgument(item.get(PipeItemData.class).isPresent(),
                                     "Cannot load a PipeItem from an Item that is missing PipeItemData.");
+        Util.setItemDisplayOnly(item, true);
         Location<World> location = item.getLocation();
         BlockLoc<World> blockLoc = new BlockLoc<>(location);
         World world = location.getExtent();
-        Entity entity = world.getEntity(item.get(LimeFunKeys.PIPE_ARMOR_STAND_ID).get())
-                .orElseThrow(() -> new IllegalStateException("The armor stand UUID belongs to an entity which is not an armor stand."));
+        UUID armorStandId = item.get(LimeFunKeys.PIPE_ARMOR_STAND_ID).get();
+        Entity entity = Optional.ofNullable(uuidEntityMap.get(armorStandId)).orElseGet(() ->
+            world.getEntity(armorStandId).orElseThrow(() ->
+                new IllegalStateException("The armor stand UUID belongs to an entity which is not an armor stand."))
+        );
         ArmorStand armorStand = (ArmorStand) entity;
         DyeColor pipeColor = getStainedGlassColor(blockLoc);
 
@@ -261,6 +263,10 @@ public class PipeItem {
             // unit circle circumference * radius * quarter turn
             return 2 * Math.PI * 0.5 * 0.25;
         }
+    }
+
+    public void removeArmorStand() {
+        armorStand.remove();
     }
 
     public void unregisterAndDrop() {

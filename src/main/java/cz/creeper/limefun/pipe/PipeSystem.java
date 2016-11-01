@@ -13,15 +13,13 @@ import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.entity.Entity;
 import org.spongepowered.api.entity.EntityTypes;
 import org.spongepowered.api.entity.Item;
-import org.spongepowered.api.entity.living.ArmorStand;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.block.ChangeBlockEvent;
 import org.spongepowered.api.event.cause.Cause;
 import org.spongepowered.api.event.cause.entity.spawn.BlockSpawnCause;
 import org.spongepowered.api.event.cause.entity.spawn.SpawnTypes;
-import org.spongepowered.api.event.entity.ConstructEntityEvent;
+import org.spongepowered.api.event.entity.ExpireEntityEvent;
 import org.spongepowered.api.event.entity.SpawnEntityEvent;
-import org.spongepowered.api.event.entity.item.ItemMergeItemEvent;
 import org.spongepowered.api.item.inventory.ItemStackSnapshot;
 import org.spongepowered.api.scheduler.Task;
 import org.spongepowered.api.util.Direction;
@@ -30,6 +28,7 @@ import org.spongepowered.api.world.World;
 import org.spongepowered.api.world.extent.Extent;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class PipeSystem {
     @Getter private final LimeFun plugin;
@@ -52,6 +51,10 @@ public class PipeSystem {
                 .intervalTicks(1).submit(plugin);
 
         Sponge.getEventManager().registerListeners(plugin, this);
+
+/*        Sponge.getServer().getWorlds().forEach(world -> world.getEntities(
+                    entity -> entity instanceof Item && entity.get(PipeItemData.class).isPresent()
+        ).stream().map(Item.class::cast).forEach(this::loadItem));*/
     }
 
     public void stop() {
@@ -97,8 +100,8 @@ public class PipeSystem {
     /**
      * Loads a {@link PipeItem} and registers it in the system.
      */
-    public PipeItem loadItem(Item item) {
-        return registerItem(PipeItem.load(this, item));
+    public PipeItem loadItem(Item item, Map<UUID, Entity> uuidEntityMap) {
+        return registerItem(PipeItem.load(this, item, uuidEntityMap));
     }
 
     /**
@@ -115,9 +118,33 @@ public class PipeSystem {
      * Removes the {@link PipeItem} from the system.
      * Does not do anything to the {@link PipeItem} other than that.
      */
-    public void unregisterItem(PipeItem item) {
-        uuidToItems.remove(item.getItem().getUniqueId());
-        blockToItems.remove(item.getPipe(), item);
+    public boolean unregisterItem(PipeItem item) {
+        item.removeArmorStand();
+        return uuidToItems.remove(item.getItem().getUniqueId()) != null
+                & blockToItems.remove(item.getPipe(), item);
+    }
+
+    /**
+     * Removes the {@link PipeItem} associated with the specified {@link Item} from the system.
+     * Does not do anything to the {@link PipeItem} other than that.
+     */
+    public boolean unregisterItem(Item item) {
+        PipeItem pipeItem = uuidToItems.remove(item.getUniqueId());
+
+        if(pipeItem == null)
+            return false;
+
+        pipeItem.removeArmorStand();
+
+        return blockToItems.remove(pipeItem.getPipe(), pipeItem);
+    }
+
+    public Optional<PipeItem> getItem(Item item) {
+        return Optional.ofNullable(uuidToItems.get(item.getUniqueId()));
+    }
+
+    public boolean isRegistered(Item item) {
+        return uuidToItems.containsKey(item.getUniqueId());
     }
 
     public void swapBlockKey(BlockLoc<World> from, BlockLoc<World> to, PipeItem item) {
@@ -126,20 +153,69 @@ public class PipeSystem {
     }
 
     @Listener
-    public void onChangeBlock(ChangeBlockEvent event) {
-        // TODO
+    public void onChangeBlock(ChangeBlockEvent.Post event) {
+        event.getTransactions().forEach(transaction -> {
+            Location<World> location = transaction.getOriginal().getLocation().get();
+            BlockLoc<World> blockLoc = new BlockLoc<>(location);
+            Set<PipeItem> pipeItems = blockToItems.get(blockLoc);
+
+            if(pipeItems.isEmpty())
+                return;
+
+            PipeItem[] array = pipeItems.toArray(new PipeItem[pipeItems.size()]);
+
+            for(PipeItem item : array) {
+                item.unregisterAndDrop();
+            }
+        });
     }
 
     @Listener
-    public void onLoadEntity(SpawnEntityEvent.ChunkLoad event) {
-        for(Entity entity : event.getEntities()) {
-            if(entity instanceof ArmorStand) {
-                System.out.println("LOADED ARMOR STAND: " + entity);
-            } else if(entity instanceof Item) {
-                System.out.println("LOADED ITEM: " + entity);
+    public void onSpawnEntityChunkLoad(SpawnEntityEvent.ChunkLoad event) {
+        List<Entity> entities = event.getEntities();
+        Map<UUID, Entity> uuidEntityMap = null;
+
+        for(Entity entity : entities) {
+            if(!(entity instanceof Item))
+                continue;
+
+            Item item = (Item) entity;
+
+            if(item.get(PipeItemData.class).isPresent() && !isRegistered(item)) {
+                if(uuidEntityMap == null)
+                    uuidEntityMap = entities.stream().collect(Collectors.toMap(Entity::getUniqueId, e -> e));
+
+                loadItem(item, uuidEntityMap);
             }
         }
     }
+
+    @Listener
+    public void onExpireEntity(ExpireEntityEvent event) {
+        Entity entity = event.getTargetEntity();
+
+        if(!(entity instanceof Item))
+            return;
+
+        Item item = (Item) entity;
+
+        unregisterItem(item);
+    }
+
+    /*    @Listener
+    @Listener
+    public void onUnloadChunk(UnloadChunkEvent event) {
+        Chunk chunk = event.getTargetChunk();
+
+        for(Entity entity : chunk.getEntities()) {
+            if(!(entity instanceof Item))
+                continue;
+
+            Item item = (Item) entity;
+
+            getItem(item).ifPresent(this::unregisterItem);
+        }
+    }*/
 
     @Listener
     public void onSpawnEntity(SpawnEntityEvent event) {
