@@ -13,6 +13,7 @@ import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.entity.Entity;
 import org.spongepowered.api.entity.EntityTypes;
 import org.spongepowered.api.entity.Item;
+import org.spongepowered.api.entity.living.ArmorStand;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.block.ChangeBlockEvent;
 import org.spongepowered.api.event.cause.Cause;
@@ -125,30 +126,18 @@ public class PipeSystem {
     }
 
     @Listener
-    public void onItemMergeItem(ItemMergeItemEvent event) {
-        if(uuidToItems.containsKey(event.getItemToMerge().getUniqueId())
-                || uuidToItems.containsKey(event.getTargetEntity().getUniqueId())) {
-            event.setCancelled(true);
-        }
-    }
-
-    @Listener
     public void onChangeBlock(ChangeBlockEvent event) {
         // TODO
     }
 
     @Listener
-    public void onPostConstructEntity(ConstructEntityEvent.Post event) {
-        Entity entity = event.getTargetEntity();
-
-        if(!(entity instanceof Item))
-            return;
-
-        Item item = (Item) entity;
-
-        if(item.get(PipeItemData.class).isPresent()) {
-            System.out.println(item);  // TODO: this never fires. Why aren't you being loaded, PipeItemData?!
-            loadItem(item);
+    public void onLoadEntity(SpawnEntityEvent.ChunkLoad event) {
+        for(Entity entity : event.getEntities()) {
+            if(entity instanceof ArmorStand) {
+                System.out.println("LOADED ARMOR STAND: " + entity);
+            } else if(entity instanceof Item) {
+                System.out.println("LOADED ITEM: " + entity);
+            }
         }
     }
 
