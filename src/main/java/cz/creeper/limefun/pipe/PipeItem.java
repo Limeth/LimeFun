@@ -283,30 +283,11 @@ public class PipeItem {
         return location.add(0, -0.3, 0);
     }
 
-    /*public static <E extends Extent> Location<E> getEnteringLocation(Direction enteringDirection, BlockLoc<E> pipe) {
-        Direction opposite = enteringDirection.getOpposite();
-        return pipe.getLocation().add(0.5, 0.5, 0.5)
-                .add(opposite.asOffset().mul(0.5));
-    }
-
-    public Location<World> getEnteringLocation() {
-        return getEnteringLocation(getEnteringDirection(), pipe);
-    }*/
-
     public Location<World> getEnteringLocation() {
         Direction opposite = getEnteringDirection().getOpposite();
         return pipe.getLocation().add(0.5, 0.5, 0.5)
                 .add(opposite.asOffset().mul(0.5));
     }
-
-    /*public static <E extends Extent> Location<E> getExitingLocation(Direction exitingDirection, BlockLoc<E> pipe) {
-        return pipe.getLocation().add(0.5, 0.5, 0.5)
-                .add(exitingDirection.asOffset().mul(0.5));
-    }
-
-    public Location<World> getExitingLocation() {
-        return getExitingLocation(getExitingDirection(), pipe);
-    }*/
 
     public Location<World> getExitingLocation() {
         return pipe.getLocation().add(0.5, 0.5, 0.5)
