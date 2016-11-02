@@ -28,7 +28,6 @@ import org.spongepowered.api.world.World;
 import org.spongepowered.api.world.extent.Extent;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class PipeSystem {
     @Getter private final LimeFun plugin;
@@ -51,10 +50,6 @@ public class PipeSystem {
                 .intervalTicks(1).submit(plugin);
 
         Sponge.getEventManager().registerListeners(plugin, this);
-
-/*        Sponge.getServer().getWorlds().forEach(world -> world.getEntities(
-                    entity -> entity instanceof Item && entity.get(PipeItemData.class).isPresent()
-        ).stream().map(Item.class::cast).forEach(this::loadItem));*/
     }
 
     public void stop() {
@@ -94,21 +89,21 @@ public class PipeSystem {
      * Creates a {@link PipeItem} and registers it in the system.
      */
     public PipeItem registerItem(Item item, BlockLoc<World> pipe, Direction enteringDirection, double distanceTravelledInCurrentPipe) {
-        return registerItem(PipeItem.create(this, pipe, item, enteringDirection, distanceTravelledInCurrentPipe));
+        return registerItem(PipeItem.create(this, pipe, item, enteringDirection, distanceTravelledInCurrentPipe), item);
     }
 
     /**
      * Loads a {@link PipeItem} and registers it in the system.
      */
-    public PipeItem loadItem(Item item, Map<UUID, Entity> uuidEntityMap) {
-        return registerItem(PipeItem.load(this, item, uuidEntityMap));
+    public PipeItem loadItem(Item item) {
+        return registerItem(PipeItem.load(this, item), item);
     }
 
     /**
      * Registers a {@link PipeItem} in the system.
      */
-    public PipeItem registerItem(PipeItem pipeItem) {
-        uuidToItems.put(pipeItem.getItem().getUniqueId(), pipeItem);
+    public PipeItem registerItem(PipeItem pipeItem, Item item) {
+        uuidToItems.put(item.getUniqueId(), pipeItem);
         blockToItems.put(pipeItem.getPipe(), pipeItem);
 
         return pipeItem;
@@ -119,7 +114,6 @@ public class PipeSystem {
      * Does not do anything to the {@link PipeItem} other than that.
      */
     public boolean unregisterItem(PipeItem item) {
-        item.removeArmorStand();
         return uuidToItems.remove(item.getItem().getUniqueId()) != null
                 & blockToItems.remove(item.getPipe(), item);
     }
@@ -128,15 +122,16 @@ public class PipeSystem {
      * Removes the {@link PipeItem} associated with the specified {@link Item} from the system.
      * Does not do anything to the {@link PipeItem} other than that.
      */
-    public boolean unregisterItem(Item item) {
+    public Optional<PipeItem> unregisterItem(Item item) {
+        System.out.println("UNREGISTERING " + item);
         PipeItem pipeItem = uuidToItems.remove(item.getUniqueId());
 
         if(pipeItem == null)
-            return false;
+            return Optional.empty();
 
-        pipeItem.removeArmorStand();
+        blockToItems.remove(pipeItem.getPipe(), pipeItem);
 
-        return blockToItems.remove(pipeItem.getPipe(), pipeItem);
+        return Optional.of(pipeItem);
     }
 
     public Optional<PipeItem> getItem(Item item) {
@@ -173,7 +168,6 @@ public class PipeSystem {
     @Listener
     public void onSpawnEntityChunkLoad(SpawnEntityEvent.ChunkLoad event) {
         List<Entity> entities = event.getEntities();
-        Map<UUID, Entity> uuidEntityMap = null;
 
         for(Entity entity : entities) {
             if(!(entity instanceof Item))
@@ -182,10 +176,7 @@ public class PipeSystem {
             Item item = (Item) entity;
 
             if(item.get(PipeItemData.class).isPresent() && !isRegistered(item)) {
-                if(uuidEntityMap == null)
-                    uuidEntityMap = entities.stream().collect(Collectors.toMap(Entity::getUniqueId, e -> e));
-
-                loadItem(item, uuidEntityMap);
+                loadItem(item);
             }
         }
     }
@@ -199,7 +190,9 @@ public class PipeSystem {
 
         Item item = (Item) entity;
 
-        unregisterItem(item);
+        unregisterItem(item).ifPresent(pipeItem ->
+                pipeItem.getArmorStand().remove()
+        );
     }
 
     /*    @Listener

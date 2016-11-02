@@ -14,7 +14,6 @@ import org.spongepowered.api.block.tileentity.carrier.TileEntityCarrier;
 import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.data.manipulator.mutable.DyeableData;
 import org.spongepowered.api.data.type.DyeColor;
-import org.spongepowered.api.entity.Entity;
 import org.spongepowered.api.entity.EntityTypes;
 import org.spongepowered.api.entity.Item;
 import org.spongepowered.api.entity.living.ArmorStand;
@@ -36,8 +35,7 @@ public class PipeItem {
     @NonNull private final PipeSystem system;
     /** Make sure to use {@link #setPipe(BlockLoc)} */
     @NonNull private BlockLoc<World> pipe;
-    @NonNull @Setter private Item item;
-    @NonNull @Setter private ArmorStand armorStand;
+    @NonNull @Setter private UUID itemId;
     @NonNull @Setter private DyeColor pipeColor;
 
     public static PipeItem create(PipeSystem system, BlockLoc<World> pipe, Item item, Direction enteringDirection, double distanceTravelledInCurrentPipe) {
@@ -46,6 +44,7 @@ public class PipeItem {
         item.offer(LimeFunKeys.PIPE_ENTERING_DIRECTION, enteringDirection);
         item.offer(LimeFunKeys.PIPE_DISTANCE_TRAVELLED, distanceTravelledInCurrentPipe);
 
+        UUID itemId = item.getUniqueId();
         DyeColor pipeColor = getStainedGlassColor(pipe);
         Location itemLocation = item.getLocation();
         Extent extent = itemLocation.getExtent();
@@ -54,36 +53,31 @@ public class PipeItem {
         armorStand.offer(Keys.HAS_GRAVITY, false);
         armorStand.offer(Keys.ARMOR_STAND_MARKER, true);
         //armorStand.offer(Keys.INVISIBLE, true);
-        PipeItem pipeItem = new PipeItem(system, pipe, item, armorStand, pipeColor);
+        PipeItem pipeItem = new PipeItem(system, pipe, itemId, pipeColor);
 
         pipeItem.chooseExitingDirection();
-        pipeItem.updateDisplayLocation();
 
         if(!extent.spawnEntity(armorStand, Cause.source(system.getPlugin()).build()))
             throw new IllegalStateException("Could not spawn the armor stand.");
 
+        pipeItem.setArmorStandId(armorStand.getUniqueId());
+        pipeItem.updateDisplayLocation();
         armorStand.addPassenger(item);
         item.offer(LimeFunKeys.PIPE_ARMOR_STAND_ID, armorStand.getUniqueId());
 
         return pipeItem;
     }
 
-    public static PipeItem load(PipeSystem system, Item item, Map<UUID, Entity> uuidEntityMap) {
+    public static PipeItem load(PipeSystem system, Item item) {
         Preconditions.checkArgument(item.get(PipeItemData.class).isPresent(),
                                     "Cannot load a PipeItem from an Item that is missing PipeItemData.");
         Util.setItemDisplayOnly(item, true);
+        UUID itemId = item.getUniqueId();
         Location<World> location = item.getLocation();
         BlockLoc<World> blockLoc = new BlockLoc<>(location);
-        World world = location.getExtent();
-        UUID armorStandId = item.get(LimeFunKeys.PIPE_ARMOR_STAND_ID).get();
-        Entity entity = Optional.ofNullable(uuidEntityMap.get(armorStandId)).orElseGet(() ->
-            world.getEntity(armorStandId).orElseThrow(() ->
-                new IllegalStateException("The armor stand UUID belongs to an entity which is not an armor stand."))
-        );
-        ArmorStand armorStand = (ArmorStand) entity;
         DyeColor pipeColor = getStainedGlassColor(blockLoc);
 
-        return new PipeItem(system, blockLoc, item, armorStand, pipeColor);
+        return new PipeItem(system, blockLoc, itemId, pipeColor);
     }
 
     public static <E extends Extent> DyeColor getStainedGlassColor(BlockLoc<E> block) {
@@ -96,7 +90,7 @@ public class PipeItem {
     }
 
     public void chooseExitingDirection() {
-        item.offer(LimeFunKeys.PIPE_EXITING_DIRECTION, chooseExitingDirection(pipe, item.get(LimeFunKeys.PIPE_ENTERING_DIRECTION).get(), pipeColor, system.getPlugin().getRandom()));
+        setExitingDirection(chooseExitingDirection(pipe, getEnteringDirection(), pipeColor, system.getPlugin().getRandom()));
     }
 
     public static <E extends Extent> Direction chooseExitingDirection(BlockLoc<E> pipe, Direction enteringDirection,
@@ -157,13 +151,13 @@ public class PipeItem {
      */
     public boolean enterBlock() {
         Location<World> location = pipe.getLocation();
-        Location<World> enteringLocation = location.getBlockRelative(item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get());
+        Location<World> enteringLocation = location.getBlockRelative(getExitingDirection());
         BlockLoc<World> enteringBlock = new BlockLoc<>(enteringLocation);
         BlockType type = enteringLocation.getBlockType();
 
         if(type == BlockTypes.STAINED_GLASS) {
             setPipe(enteringBlock);
-            item.offer(LimeFunKeys.PIPE_ENTERING_DIRECTION, item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get());
+            setEnteringDirection(getExitingDirection());
             chooseExitingDirection();
             return true;
         }
@@ -171,7 +165,9 @@ public class PipeItem {
         if(type == BlockTypes.AIR) {  // TODO: Check for opacity, not just AIR
             Location<World> droppingLocation = getDroppingLocation();
             Vector3d droppingVelocity = getDroppingVelocity();
-            armorStand.setLocation(applyArmorStandOffset(droppingLocation));
+            Item item = getItem();
+
+            getArmorStand().setLocation(applyArmorStandOffset(droppingLocation));
             unregisterAndDrop();
             item.setLocation(droppingLocation);
             item.setVelocity(droppingVelocity);
@@ -186,6 +182,7 @@ public class PipeItem {
             if (frontTileEntity instanceof TileEntityCarrier) {
                 TileEntityCarrier carrier = (TileEntityCarrier) frontTileEntity;
                 TileEntityInventory<TileEntityCarrier> inventory = carrier.getInventory();
+                Item item = getItem();
                 ItemStack offering = item.item().get().createStack();
                 InventoryTransactionResult result = inventory.offer(offering);
                 List<ItemStackSnapshot> returnedItems = Lists.newArrayList(result.getRejectedItems());
@@ -195,7 +192,7 @@ public class PipeItem {
                 unregisterAndDespawn();
 
                 for(ItemStackSnapshot snapshot : returnedItems) {
-                    system.createAndRegister(snapshot, exitingLocation, pipe, item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get().getOpposite(), 0.0);
+                    system.createAndRegister(snapshot, exitingLocation, pipe, getExitingDirection().getOpposite(), 0.0);
                 }
 
                 return true;
@@ -203,22 +200,20 @@ public class PipeItem {
         }
 
         // Else, bounce back
-        item.offer(LimeFunKeys.PIPE_ENTERING_DIRECTION, item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get().getOpposite());
+        setEnteringDirection(getExitingDirection().getOpposite());
         chooseExitingDirection();
 
         return true;
     }
 
     public void tick() {
-        item.offer(LimeFunKeys.PIPE_DISTANCE_TRAVELLED, item.get(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get() + system.getSpeed());
+        setDistanceTravelled(getDistanceTravelled() + system.getSpeed());
         double maxTravelDistance;
         boolean updateLocation = true;
 
-        while(item.get(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get()
-              >= (maxTravelDistance = getTravelDistance(item.get(LimeFunKeys.PIPE_ENTERING_DIRECTION).get(),
-                                                        item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get()))) {
-            final double maxTravelDistanceFinal = maxTravelDistance;
-            item.offer(LimeFunKeys.PIPE_DISTANCE_TRAVELLED, item.get(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get() - maxTravelDistanceFinal);
+        while(getDistanceTravelled() >= (maxTravelDistance = getTravelDistance(getEnteringDirection(),
+                                                                               getExitingDirection()))) {
+            setDistanceTravelled(getDistanceTravelled() - maxTravelDistance);
             updateLocation = enterBlock();
         }
 
@@ -226,30 +221,28 @@ public class PipeItem {
             updateDisplayLocation();
     }
 
-    private void updateDisplayLocation() {
-        armorStand.setLocation(getDisplayLocation(pipe,
-                                                  item.get(LimeFunKeys.PIPE_ENTERING_DIRECTION).get(),
-                                                  item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get(),
-                                                  item.get(LimeFunKeys.PIPE_DISTANCE_TRAVELLED).get()));
-    }
-
-    private static <E extends Extent> Location<E> getDisplayLocation(BlockLoc<E> pipe, Direction enteringDirection, Direction exitingDirection, double distanceTravelledInCurrentPipe) {
+    private Location<World> updateDisplayLocation() {
+        Direction enteringDirection = getEnteringDirection();
+        Direction exitingDirection = getExitingDirection();
         Preconditions.checkArgument(!enteringDirection.isOpposite(exitingDirection),
                 "The entering and exiting directions must not be the opposite.");
         double maxDistance = getTravelDistance(enteringDirection, exitingDirection);
-        Location<E> enteringLocation = getEnteringLocation(enteringDirection, pipe);
-        Location<E> result;
+        double distanceTravelled = getDistanceTravelled();
+        Location<World> enteringLocation = getEnteringLocation();
+        Location<World> result;
 
         if(enteringDirection == exitingDirection) {
-            result = enteringLocation.add(enteringDirection.asOffset().mul(distanceTravelledInCurrentPipe));
+            result = enteringLocation.add(enteringDirection.asOffset().mul(distanceTravelled));
         } else {
-            double progress = distanceTravelledInCurrentPipe / maxDistance;
+            double progress = distanceTravelled / maxDistance;
             double gon = progress * Math.PI / 2.0;  // a quarter turn
             result = enteringLocation.add(enteringDirection.asOffset().mul(0.5).mul(Math.sin(gon)))
-                                     .add(exitingDirection.asOffset().mul(0.5).mul(1.0 - Math.cos(gon)));
+                    .add(exitingDirection.asOffset().mul(0.5).mul(1.0 - Math.cos(gon)));
         }
 
         result = applyArmorStandOffset(result);
+
+        getArmorStand().setLocation(result);
 
         return result;
     }
@@ -265,21 +258,19 @@ public class PipeItem {
         }
     }
 
-    public void removeArmorStand() {
-        armorStand.remove();
-    }
-
     public void unregisterAndDrop() {
-        item.offer(LimeFunKeys.PIPE_DISTANCE_TRAVELLED, 0.0);
+        Item item = getItem();
+
+        setDistanceTravelled(0.0);
         system.unregisterItem(this);
         item.setVehicle(null);
-        armorStand.remove();
+        getArmorStand().remove();
         Util.setItemDisplayOnly(item, false);
     }
 
     public void unregisterAndDespawn() {
         unregisterAndDrop();
-        item.remove();
+        getItem().remove();
     }
 
     public void setPipe(BlockLoc<World> pipe) {
@@ -292,30 +283,95 @@ public class PipeItem {
         return location.add(0, -0.3, 0);
     }
 
-    public static <E extends Extent> Location<E> getEnteringLocation(Direction enteringDirection, BlockLoc<E> pipe) {
+    /*public static <E extends Extent> Location<E> getEnteringLocation(Direction enteringDirection, BlockLoc<E> pipe) {
         Direction opposite = enteringDirection.getOpposite();
         return pipe.getLocation().add(0.5, 0.5, 0.5)
                 .add(opposite.asOffset().mul(0.5));
     }
 
     public Location<World> getEnteringLocation() {
-        return getEnteringLocation(item.get(LimeFunKeys.PIPE_ENTERING_DIRECTION).get(), pipe);
+        return getEnteringLocation(getEnteringDirection(), pipe);
+    }*/
+
+    public Location<World> getEnteringLocation() {
+        Direction opposite = getEnteringDirection().getOpposite();
+        return pipe.getLocation().add(0.5, 0.5, 0.5)
+                .add(opposite.asOffset().mul(0.5));
     }
 
-    public <E extends Extent> Location<E> getExitingLocation(Direction exitingDirection, BlockLoc<E> pipe) {
+    /*public static <E extends Extent> Location<E> getExitingLocation(Direction exitingDirection, BlockLoc<E> pipe) {
         return pipe.getLocation().add(0.5, 0.5, 0.5)
                 .add(exitingDirection.asOffset().mul(0.5));
     }
 
     public Location<World> getExitingLocation() {
-        return getExitingLocation(item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get(), pipe);
+        return getExitingLocation(getExitingDirection(), pipe);
+    }*/
+
+    public Location<World> getExitingLocation() {
+        return pipe.getLocation().add(0.5, 0.5, 0.5)
+                .add(getExitingDirection().asOffset().mul(0.5));
     }
 
     public Location<World> getDroppingLocation() {
-        return getExitingLocation().add(item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get().asOffset().div(8));
+        return getExitingLocation().add(getExitingDirection().asOffset().div(8));
     }
 
     public Vector3d getDroppingVelocity() {
-        return item.get(LimeFunKeys.PIPE_EXITING_DIRECTION).get().asOffset().mul(system.getSpeed());
+        return getExitingDirection().asOffset().mul(system.getSpeed());
+    }
+
+    public Direction getEnteringDirection() {
+        return getItem().get(LimeFunKeys.PIPE_ENTERING_DIRECTION)
+                .orElseThrow(() -> new IllegalStateException("No entering direction data found."));
+    }
+
+    public boolean setEnteringDirection(Direction enteringDirection) {
+        return getItem().offer(LimeFunKeys.PIPE_ENTERING_DIRECTION, enteringDirection)
+                .isSuccessful();
+    }
+
+    public Direction getExitingDirection() {
+        return getItem().get(LimeFunKeys.PIPE_EXITING_DIRECTION)
+                .orElseThrow(() -> new IllegalStateException("No exiting direction data found."));
+    }
+
+    public boolean setExitingDirection(Direction enteringDirection) {
+        return getItem().offer(LimeFunKeys.PIPE_EXITING_DIRECTION, enteringDirection)
+                .isSuccessful();
+    }
+
+    public double getDistanceTravelled() {
+        return getItem().get(LimeFunKeys.PIPE_DISTANCE_TRAVELLED)
+                .orElseThrow(() -> new IllegalStateException("No distance travelled data found."));
+    }
+
+    public boolean setDistanceTravelled(double distanceTravelled) {
+        return getItem().offer(LimeFunKeys.PIPE_DISTANCE_TRAVELLED, distanceTravelled)
+                .isSuccessful();
+    }
+
+    public UUID getArmorStandId() {
+        return getItem().get(LimeFunKeys.PIPE_ARMOR_STAND_ID)
+                .orElseThrow(() -> new IllegalStateException("No armor stand id data found."));
+    }
+
+    public boolean setArmorStandId(UUID armorStandId) {
+        return getItem().offer(LimeFunKeys.PIPE_ARMOR_STAND_ID, armorStandId)
+                .isSuccessful();
+    }
+
+    public ArmorStand getArmorStand() {
+        return getWorld().getEntity(getArmorStandId()).map(ArmorStand.class::cast)
+                .orElseThrow(() -> new IllegalStateException("Cannot access the armor stand entity."));
+    }
+
+    public Item getItem() {
+        return getWorld().getEntity(itemId).map(Item.class::cast)
+                .orElseThrow(() -> new IllegalStateException("Cannot access the item entity."));
+    }
+
+    public World getWorld() {
+        return pipe.getExtent();
     }
 }
