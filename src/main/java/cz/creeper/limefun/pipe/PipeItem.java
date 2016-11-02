@@ -264,6 +264,7 @@ public class PipeItem {
         setDistanceTravelled(0.0);
         system.unregisterItem(this);
         item.setVehicle(null);
+        item.remove(PipeItemData.class);
         getArmorStand().remove();
         Util.setItemDisplayOnly(item, false);
     }
@@ -350,6 +351,10 @@ public class PipeItem {
     public Item getItem() {
         return getWorld().getEntity(itemId).map(Item.class::cast)
                 .orElseThrow(() -> new IllegalStateException("Cannot access the item entity."));
+    }
+
+    public boolean isItemAvailable() {
+        return getWorld().getEntity(itemId).isPresent();
     }
 
     public World getWorld() {

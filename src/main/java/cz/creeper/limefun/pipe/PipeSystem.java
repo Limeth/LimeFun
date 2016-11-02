@@ -69,8 +69,12 @@ public class PipeSystem {
         // Clone the collection so we don't get a ConcurrentModificationException.
         Collection<PipeItem> values = uuidToItems.values();
 
-        for(PipeItem item : values.toArray(new PipeItem[values.size()]))
-            item.tick();
+        for(PipeItem item : values.toArray(new PipeItem[values.size()])) {
+            if(item.isItemAvailable())
+                item.tick();
+            else
+                unregisterItem(item.getItemId());
+        }
     }
 
     public PipeItem createAndRegister(ItemStackSnapshot snapshot, Location<World> location,
@@ -122,9 +126,8 @@ public class PipeSystem {
      * Removes the {@link PipeItem} associated with the specified {@link Item} from the system.
      * Does not do anything to the {@link PipeItem} other than that.
      */
-    public Optional<PipeItem> unregisterItem(Item item) {
-        System.out.println("UNREGISTERING " + item);
-        PipeItem pipeItem = uuidToItems.remove(item.getUniqueId());
+    public Optional<PipeItem> unregisterItem(UUID itemId) {
+        PipeItem pipeItem = uuidToItems.remove(itemId);
 
         if(pipeItem == null)
             return Optional.empty();
@@ -190,25 +193,10 @@ public class PipeSystem {
 
         Item item = (Item) entity;
 
-        unregisterItem(item).ifPresent(pipeItem ->
+        unregisterItem(item.getUniqueId()).ifPresent(pipeItem ->
                 pipeItem.getArmorStand().remove()
         );
     }
-
-    /*    @Listener
-    @Listener
-    public void onUnloadChunk(UnloadChunkEvent event) {
-        Chunk chunk = event.getTargetChunk();
-
-        for(Entity entity : chunk.getEntities()) {
-            if(!(entity instanceof Item))
-                continue;
-
-            Item item = (Item) entity;
-
-            getItem(item).ifPresent(this::unregisterItem);
-        }
-    }*/
 
     @Listener
     public void onSpawnEntity(SpawnEntityEvent event) {
