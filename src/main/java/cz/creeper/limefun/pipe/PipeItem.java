@@ -264,9 +264,9 @@ public class PipeItem {
         setDistanceTravelled(0.0);
         system.unregisterItem(this);
         item.setVehicle(null);
-        item.remove(PipeItemData.class);
         getArmorStand().remove();
         Util.setItemDisplayOnly(item, false);
+        item.remove(PipeItemData.class);
     }
 
     public void unregisterAndDespawn() {
