@@ -208,17 +208,29 @@ public class PipeItem {
 
     public void tick() {
         setDistanceTravelled(getDistanceTravelled() + system.getSpeed());
-        double maxTravelDistance;
+        Optional<Double> maxTravelDistance;
         boolean updateLocation = true;
 
-        while(getDistanceTravelled() >= (maxTravelDistance = getTravelDistance(getEnteringDirection(),
-                                                                               getExitingDirection()))) {
-            setDistanceTravelled(getDistanceTravelled() - maxTravelDistance);
+        while((maxTravelDistance = getForeignDistance()).isPresent()) {
+            //noinspection OptionalGetWithoutIsPresent
+            setDistanceTravelled(getDistanceTravelled() - maxTravelDistance.get());
             updateLocation = enterBlock();
         }
 
         if(updateLocation)
             updateDisplayLocation();
+    }
+
+    public Optional<Double> getForeignDistance() {
+        if(!getItem().get(PipeItemData.class).isPresent())
+            return Optional.empty();
+
+        double maxTravelDistance = getTravelDistance(getEnteringDirection(), getExitingDirection());
+
+        if(getDistanceTravelled() < maxTravelDistance)
+            return Optional.empty();
+
+        return Optional.of(maxTravelDistance);
     }
 
     private Location<World> updateDisplayLocation() {
