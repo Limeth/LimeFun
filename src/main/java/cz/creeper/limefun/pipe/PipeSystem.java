@@ -13,13 +13,17 @@ import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.entity.Entity;
 import org.spongepowered.api.entity.EntityTypes;
 import org.spongepowered.api.entity.Item;
+import org.spongepowered.api.entity.living.ArmorStand;
 import org.spongepowered.api.event.Listener;
+import org.spongepowered.api.event.Order;
 import org.spongepowered.api.event.block.ChangeBlockEvent;
 import org.spongepowered.api.event.cause.Cause;
 import org.spongepowered.api.event.cause.entity.spawn.BlockSpawnCause;
 import org.spongepowered.api.event.cause.entity.spawn.SpawnTypes;
 import org.spongepowered.api.event.entity.ExpireEntityEvent;
+import org.spongepowered.api.event.entity.MoveEntityEvent;
 import org.spongepowered.api.event.entity.SpawnEntityEvent;
+import org.spongepowered.api.event.entity.TargetEntityEvent;
 import org.spongepowered.api.item.inventory.ItemStackSnapshot;
 import org.spongepowered.api.scheduler.Task;
 import org.spongepowered.api.util.Direction;
@@ -196,6 +200,28 @@ public class PipeSystem {
         unregisterItem(item.getUniqueId()).ifPresent(pipeItem ->
                 pipeItem.getArmorStand().remove()
         );
+    }
+
+    @Listener(order = Order.EARLY)
+    public void onEntity(TargetEntityEvent event) {
+        Entity entity = event.getTargetEntity();
+
+        if(event instanceof MoveEntityEvent
+                || event.getClass().getSimpleName().endsWith("LivingUpdateEvent")
+                || event.getClass().getSimpleName().endsWith("EnteringChunk")
+                || event.getClass().getSimpleName().endsWith("CanUpdate"))
+            return;
+
+        if(!(entity instanceof ArmorStand))
+            return;
+
+        UUID uuid = entity.getUniqueId();
+
+        for(PipeItem pipeItem : uuidToItems.values()) {
+            if(pipeItem.getArmorStandId().equals(uuid)) {
+                System.out.println("TARGET ENTITY EVENT: " + event);
+            }
+        }
     }
 
     @Listener

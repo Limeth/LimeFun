@@ -195,7 +195,7 @@ public class PipeItem {
                     system.createAndRegister(snapshot, exitingLocation, pipe, getExitingDirection().getOpposite(), 0.0);
                 }
 
-                return true;
+                return false;
             }
         }
 
@@ -209,16 +209,16 @@ public class PipeItem {
     public void tick() {
         setDistanceTravelled(getDistanceTravelled() + system.getSpeed());
         Optional<Double> maxTravelDistance;
-        boolean updateLocation = true;
 
         while((maxTravelDistance = getForeignDistance()).isPresent()) {
             //noinspection OptionalGetWithoutIsPresent
             setDistanceTravelled(getDistanceTravelled() - maxTravelDistance.get());
-            updateLocation = enterBlock();
+
+            if(!enterBlock())
+                return;
         }
 
-        if(updateLocation)
-            updateDisplayLocation();
+        updateDisplayLocation();
     }
 
     public Optional<Double> getForeignDistance() {
