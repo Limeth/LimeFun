@@ -190,10 +190,10 @@ public class PipeItem {
             }
         }
 
-        BlockState blockState = location.getBlock();
-        boolean solid = blockState.getProperty(SolidCubeProperty.class).map(AbstractProperty::getValue).orElse(false);
+        BlockState enteringBlockState = enteringLocation.getBlock();
+        boolean solid = enteringBlockState.getProperty(SolidCubeProperty.class).map(AbstractProperty::getValue).orElse(false);
 
-        if(solid) {
+        if(!solid) {
             Location<World> droppingLocation = getDroppingLocation();
             Vector3d droppingVelocity = getDroppingVelocity();
             Item item = getItem();
