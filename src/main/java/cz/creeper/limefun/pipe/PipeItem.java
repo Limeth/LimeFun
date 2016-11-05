@@ -55,7 +55,7 @@ public class PipeItem {
         armorStand.offer(Keys.ARMOR_STAND_IS_SMALL, true);
         armorStand.offer(Keys.HAS_GRAVITY, false);
         armorStand.offer(Keys.ARMOR_STAND_MARKER, true);
-        //armorStand.offer(Keys.INVISIBLE, true);
+        armorStand.offer(Keys.INVISIBLE, true);
         PipeItem pipeItem = new PipeItem(system, pipe, itemId, pipeColor);
 
         pipeItem.chooseExitingDirection();
