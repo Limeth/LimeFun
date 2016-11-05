@@ -7,12 +7,15 @@ import cz.creeper.limefun.LimeFunKeys;
 import cz.creeper.limefun.util.BlockLoc;
 import cz.creeper.limefun.util.Util;
 import lombok.*;
+import org.spongepowered.api.block.BlockState;
 import org.spongepowered.api.block.BlockType;
 import org.spongepowered.api.block.BlockTypes;
 import org.spongepowered.api.block.tileentity.TileEntity;
 import org.spongepowered.api.block.tileentity.carrier.TileEntityCarrier;
 import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.data.manipulator.mutable.DyeableData;
+import org.spongepowered.api.data.property.AbstractProperty;
+import org.spongepowered.api.data.property.block.SolidCubeProperty;
 import org.spongepowered.api.data.type.DyeColor;
 import org.spongepowered.api.entity.EntityTypes;
 import org.spongepowered.api.entity.Item;
@@ -162,18 +165,6 @@ public class PipeItem {
             return true;
         }
 
-        if(type == BlockTypes.AIR) {  // TODO: Check for opacity, not just AIR
-            Location<World> droppingLocation = getDroppingLocation();
-            Vector3d droppingVelocity = getDroppingVelocity();
-            Item item = getItem();
-
-            getArmorStand().setLocation(applyArmorStandOffset(droppingLocation));
-            unregisterAndDrop();
-            item.setLocation(droppingLocation);
-            item.setVelocity(droppingVelocity);
-            return false;
-        }
-
         Optional<TileEntity> optionalFrontTileEntity = enteringLocation.getTileEntity();
 
         if(optionalFrontTileEntity.isPresent()) {
@@ -197,6 +188,21 @@ public class PipeItem {
 
                 return false;
             }
+        }
+
+        BlockState blockState = location.getBlock();
+        boolean solid = blockState.getProperty(SolidCubeProperty.class).map(AbstractProperty::getValue).orElse(false);
+
+        if(solid) {
+            Location<World> droppingLocation = getDroppingLocation();
+            Vector3d droppingVelocity = getDroppingVelocity();
+            Item item = getItem();
+
+            getArmorStand().setLocation(applyArmorStandOffset(droppingLocation));
+            unregisterAndDrop();
+            item.setLocation(droppingLocation);
+            item.setVelocity(droppingVelocity);
+            return false;
         }
 
         // Else, bounce back
