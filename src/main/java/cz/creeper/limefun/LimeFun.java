@@ -12,11 +12,7 @@ import ninja.leaping.configurate.hocon.HoconConfigurationLoader;
 import ninja.leaping.configurate.loader.ConfigurationLoader;
 import org.slf4j.Logger;
 import org.spongepowered.api.Sponge;
-import org.spongepowered.api.command.CommandException;
 import org.spongepowered.api.command.CommandResult;
-import org.spongepowered.api.command.CommandSource;
-import org.spongepowered.api.command.args.CommandContext;
-import org.spongepowered.api.command.spec.CommandExecutor;
 import org.spongepowered.api.command.spec.CommandSpec;
 import org.spongepowered.api.config.DefaultConfig;
 import org.spongepowered.api.event.Listener;
@@ -25,6 +21,7 @@ import org.spongepowered.api.event.game.state.GameStartedServerEvent;
 import org.spongepowered.api.event.game.state.GameStoppedServerEvent;
 import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.text.Text;
+import org.spongepowered.api.text.format.TextColors;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -90,19 +87,24 @@ public class LimeFun {
         } catch (IOException e) {
             logger.error("Could not save the config: " + e.getLocalizedMessage());
         }
+
+        logger.info("Config loaded.");
     }
 
     public void registerCommands() {
+        CommandSpec lfReloadSpec = CommandSpec.builder()
+                .description(Text.of("Reloads the config file"))
+                .permission("limefun.command.lf.reload")
+                .executor((src, args) -> {
+                    loadConfig();
+                    src.sendMessage(Text.builder().append(Text.of("Config reloaded.")).color(TextColors.GREEN).build());
+                    return CommandResult.success();
+                })
+                .build();
         CommandSpec lfSpec = CommandSpec.builder()
                 .description(Text.of("LimeFun commands"))
                 .permission("limefun.command.lf")
-                .executor(new CommandExecutor() {
-                    @Override
-                    public CommandResult execute(CommandSource src, CommandContext args) throws CommandException {
-
-                        return CommandResult.success();
-                    }
-                })
+                .child(lfReloadSpec, "reload")
                 .build();
 
         Sponge.getCommandManager().register(this, lfSpec, "lf");
