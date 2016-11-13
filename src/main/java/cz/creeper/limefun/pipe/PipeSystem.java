@@ -5,6 +5,7 @@ import com.google.common.collect.HashMultimap;
 import cz.creeper.limefun.LimeFun;
 import cz.creeper.limefun.util.BlockLoc;
 import lombok.Getter;
+import lombok.Setter;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockSnapshot;
 import org.spongepowered.api.block.BlockState;
@@ -33,6 +34,8 @@ import org.spongepowered.api.world.extent.Extent;
 import java.util.*;
 
 public class PipeSystem {
+    public static final double DEFAULT_SPEED = 1.0 / 20.0;
+    public static final int DEFAULT_PIPE_CAPACITY = 4;
     @Getter private final LimeFun plugin;
     private final Map<UUID, PipeItem> uuidToItems = new HashMap<>();
     private final HashMultimap<BlockLoc<World>, PipeItem> blockToItems = HashMultimap.create();
@@ -40,11 +43,11 @@ public class PipeSystem {
     /**
      * Distance items travel per tick
      */
-    @Getter private double speed = 1.0 / 20.0;  // TODO: Make configurable
+    @Getter @Setter private double speed = DEFAULT_SPEED;  // TODO: Make configurable
     /**
      * How many items can occur in a pipe block
      */
-    @Getter private int pipeCapacity = 4;  // TODO: Make configurable
+    @Getter @Setter private int pipeCapacity = DEFAULT_PIPE_CAPACITY;  // TODO: Make configurable
 
     public PipeSystem(LimeFun plugin) {
         this.plugin = plugin;
