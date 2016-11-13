@@ -281,9 +281,11 @@ public class PipeSystem {
                 BlockLoc<World> pipeBlock = new BlockLoc<>(pipeLocation);
                 Item item = (Item) droppedEntity;
 
-                if(canTravelTo(pipeBlock)) {
-                    event.setCancelled(true);
+                event.setCancelled(true);  // TODO: This currently does not leave the item in the dropper and that may
+                                           //       may be considered a bug. Keep an eye on it, because when it's fixed,
+                                           //       it may duplicate items.
 
+                if(canTravelTo(pipeBlock)) {
                     boolean success = extent.spawnEntity(item, Cause.source(plugin).build());
 
                     if (!success)
