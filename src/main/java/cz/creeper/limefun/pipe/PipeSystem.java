@@ -9,6 +9,8 @@ import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockSnapshot;
 import org.spongepowered.api.block.BlockState;
 import org.spongepowered.api.block.BlockTypes;
+import org.spongepowered.api.block.tileentity.carrier.Dropper;
+import org.spongepowered.api.block.tileentity.carrier.Hopper;
 import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.entity.Entity;
 import org.spongepowered.api.entity.EntityTypes;
@@ -20,10 +22,7 @@ import org.spongepowered.api.event.block.ChangeBlockEvent;
 import org.spongepowered.api.event.cause.Cause;
 import org.spongepowered.api.event.cause.entity.spawn.BlockSpawnCause;
 import org.spongepowered.api.event.cause.entity.spawn.SpawnTypes;
-import org.spongepowered.api.event.entity.ExpireEntityEvent;
-import org.spongepowered.api.event.entity.MoveEntityEvent;
-import org.spongepowered.api.event.entity.SpawnEntityEvent;
-import org.spongepowered.api.event.entity.TargetEntityEvent;
+import org.spongepowered.api.event.entity.*;
 import org.spongepowered.api.item.inventory.ItemStackSnapshot;
 import org.spongepowered.api.scheduler.Task;
 import org.spongepowered.api.util.Direction;
@@ -36,12 +35,16 @@ import java.util.*;
 public class PipeSystem {
     @Getter private final LimeFun plugin;
     private final Map<UUID, PipeItem> uuidToItems = new HashMap<>();
-    private final HashMultimap<BlockLoc, PipeItem> blockToItems = HashMultimap.create();
+    private final HashMultimap<BlockLoc<World>, PipeItem> blockToItems = HashMultimap.create();
     private Task task;
     /**
      * Distance items travel per tick
      */
     @Getter private double speed = 1.0 / 20.0;  // TODO: Make configurable
+    /**
+     * How many items can occur in a pipe block
+     */
+    @Getter private int pipeCapacity = 4;  // TODO: Make configurable
 
     public PipeSystem(LimeFun plugin) {
         this.plugin = plugin;
@@ -149,6 +152,10 @@ public class PipeSystem {
         return uuidToItems.containsKey(item.getUniqueId());
     }
 
+    public boolean canTravelTo(BlockLoc<World> pipe) {
+        return blockToItems.get(pipe).size() < pipeCapacity;
+    }
+
     public void swapBlockKey(BlockLoc<World> from, BlockLoc<World> to, PipeItem item) {
         blockToItems.remove(from, item);
         blockToItems.put(to, item);
@@ -202,6 +209,20 @@ public class PipeSystem {
         );
     }
 
+    @Listener
+    public void onDestructEntity(DestructEntityEvent event) {
+        Entity target = event.getTargetEntity();
+
+        if(!(target instanceof Item))
+            return;
+
+        event.getCause().first(Hopper.class).ifPresent(hopper -> {
+            Item item = (Item) target;
+
+            System.out.println("HOPPER: " + event);
+        });
+    }
+
     @Listener(order = Order.EARLY)
     public void onEntity(TargetEntityEvent event) {
         Entity entity = event.getTargetEntity();
@@ -230,11 +251,11 @@ public class PipeSystem {
 
         cause.first(BlockSpawnCause.class).filter((blockSpawnCause -> blockSpawnCause.getType() == SpawnTypes.DISPENSE))
                 .ifPresent((blockSpawnCause) -> {
-            BlockSnapshot dropper = blockSpawnCause.getBlockSnapshot();
-            BlockState dropperState = dropper.getState();
+            BlockSnapshot dropperSnapshot = blockSpawnCause.getBlockSnapshot();
+            BlockState dropperState = dropperSnapshot.getState();
 
             if(dropperState.getType() == BlockTypes.DROPPER) {
-                Location<World> dropperLocation = dropper.getLocation()
+                Location<World> dropperLocation = dropperSnapshot.getLocation()
                         .orElseThrow(() -> new IllegalStateException("Weird, this dropper does not have a location. How did we get it in the first place?"));
                 Direction dropperDirection = dropperState.get(Keys.DIRECTION)
                         .orElseThrow(() -> new IllegalStateException("Odd, this dropper does not have a direction."));
@@ -254,17 +275,24 @@ public class PipeSystem {
                     throw new IllegalStateException("A dropper must always drop an item, dropped "
                             + droppedEntity.getClass().getName() + " instead.");
 
-                event.setCancelled(true);
-
-                Item item = (Item) droppedEntity;
-                boolean success = extent.spawnEntity(item, Cause.source(plugin).build());
-
-                if(!success)
-                    throw new IllegalStateException("Could not spawn the item entity.");
-
                 BlockLoc<World> pipeBlock = new BlockLoc<>(pipeLocation);
+                Item item = (Item) droppedEntity;
 
-                registerItem(item, pipeBlock, dropperDirection, 0.2);
+                if(canTravelTo(pipeBlock)) {
+                    event.setCancelled(true);
+
+                    boolean success = extent.spawnEntity(item, Cause.source(plugin).build());
+
+                    if (!success)
+                        throw new IllegalStateException("Could not spawn the item entity.");
+
+                    registerItem(item, pipeBlock, dropperDirection, 0.2);
+                } else {
+                    Dropper dropper = (Dropper) dropperLocation.getTileEntity()
+                            .orElseThrow(() -> new IllegalStateException("Could not access the tile entity of a dropper."));
+
+                    dropper.getInventory().offer(item.getItemData().item().get().createStack());
+                }
             }
         });
     }

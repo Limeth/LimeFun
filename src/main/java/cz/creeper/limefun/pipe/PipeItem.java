@@ -158,7 +158,7 @@ public class PipeItem {
         BlockLoc<World> enteringBlock = new BlockLoc<>(enteringLocation);
         BlockType type = enteringLocation.getBlockType();
 
-        if(type == BlockTypes.STAINED_GLASS) {
+        if(type == BlockTypes.STAINED_GLASS && system.canTravelTo(enteringBlock)) {
             setPipe(enteringBlock);
             setEnteringDirection(getExitingDirection());
             chooseExitingDirection();
