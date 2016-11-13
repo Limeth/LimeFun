@@ -107,6 +107,6 @@ public class LimeFun {
                 .child(lfReloadSpec, "reload")
                 .build();
 
-        Sponge.getCommandManager().register(this, lfSpec, "lf");
+        Sponge.getCommandManager().register(this, lfSpec, "limefun", "lf");
     }
 }
