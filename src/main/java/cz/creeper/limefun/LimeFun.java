@@ -16,6 +16,7 @@ import org.spongepowered.api.command.CommandResult;
 import org.spongepowered.api.command.spec.CommandSpec;
 import org.spongepowered.api.config.DefaultConfig;
 import org.spongepowered.api.event.Listener;
+import org.spongepowered.api.event.game.GameReloadEvent;
 import org.spongepowered.api.event.game.state.GamePreInitializationEvent;
 import org.spongepowered.api.event.game.state.GameStartedServerEvent;
 import org.spongepowered.api.event.game.state.GameStoppedServerEvent;
@@ -66,6 +67,11 @@ public class LimeFun {
         logger.info("LimeFun disabled.");
     }
 
+    @Listener
+    public void onGameReload(GameReloadEvent event) {
+        loadConfig();
+    }
+
     public void loadConfig() {
         ConfigurationLoader<CommentedConfigurationNode> loader
                 = HoconConfigurationLoader.builder().setPath(configPath).build();
@@ -92,19 +98,13 @@ public class LimeFun {
     }
 
     public void registerCommands() {
-        CommandSpec lfReloadSpec = CommandSpec.builder()
-                .description(Text.of("Reloads the config file"))
-                .permission("limefun.command.lf.reload")
-                .executor((src, args) -> {
-                    loadConfig();
-                    src.sendMessage(Text.builder().append(Text.of("Config reloaded.")).color(TextColors.GREEN).build());
-                    return CommandResult.success();
-                })
-                .build();
         CommandSpec lfSpec = CommandSpec.builder()
                 .description(Text.of("LimeFun commands"))
                 .permission("limefun.command.lf")
-                .child(lfReloadSpec, "reload")
+                .executor((src, args) -> {
+                    src.sendMessage(Text.of("Nothing to see here, yet."));
+                    return CommandResult.success();
+                })
                 .build();
 
         Sponge.getCommandManager().register(this, lfSpec, "limefun", "lf");
