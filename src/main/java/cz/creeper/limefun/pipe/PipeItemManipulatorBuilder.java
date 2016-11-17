@@ -5,13 +5,18 @@ import org.spongepowered.api.data.DataHolder;
 import org.spongepowered.api.data.DataView;
 import org.spongepowered.api.data.Queries;
 import org.spongepowered.api.data.manipulator.DataManipulatorBuilder;
+import org.spongepowered.api.data.persistence.AbstractDataBuilder;
 import org.spongepowered.api.data.persistence.InvalidDataException;
 import org.spongepowered.api.util.Direction;
 
 import java.util.Optional;
 import java.util.UUID;
 
-public class PipeItemManipulatorBuilder implements DataManipulatorBuilder<PipeItemData, ImmutablePipeItemData> {
+public class PipeItemManipulatorBuilder extends AbstractDataBuilder<PipeItemData> implements DataManipulatorBuilder<PipeItemData, ImmutablePipeItemData> {
+    public PipeItemManipulatorBuilder() {
+        super(PipeItemData.class, 1);
+    }
+
     @Override
     public PipeItemData create() {
         return new PipeItemData();
@@ -23,7 +28,7 @@ public class PipeItemManipulatorBuilder implements DataManipulatorBuilder<PipeIt
     }
 
     @Override
-    public Optional<PipeItemData> build(DataView container) throws InvalidDataException {
+    protected Optional<PipeItemData> buildContent(DataView container) throws InvalidDataException {
         switch(container.getInt(Queries.CONTENT_VERSION).get()) {
             case 1:
                 if (!container.contains(LimeFunKeys.PIPE_ENTERING_DIRECTION,
