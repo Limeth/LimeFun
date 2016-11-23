@@ -6,6 +6,7 @@ import cz.creeper.limefun.LimeFun;
 import cz.creeper.limefun.modules.Module;
 import cz.creeper.limefun.util.BlockLoc;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import ninja.leaping.configurate.ConfigurationNode;
 import org.spongepowered.api.Sponge;
@@ -36,6 +37,7 @@ import org.spongepowered.api.world.extent.Extent;
 
 import java.util.*;
 
+@RequiredArgsConstructor
 public class PipeModule implements Module {
     public static final double DEFAULT_SPEED = 1.0 / 20.0;
     public static final int DEFAULT_PIPE_CAPACITY = 4;
@@ -51,10 +53,6 @@ public class PipeModule implements Module {
      * How many items can occur in a pipe block
      */
     @Getter @Setter private int pipeCapacity = DEFAULT_PIPE_CAPACITY;  // TODO: Make configurable
-
-    public PipeModule(LimeFun plugin) {
-        this.plugin = plugin;
-    }
 
     @Listener
     public void onGamePreInitialization(GamePreInitializationEvent event) {
