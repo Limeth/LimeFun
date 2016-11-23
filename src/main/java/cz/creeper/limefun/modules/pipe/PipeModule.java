@@ -37,7 +37,6 @@ import org.spongepowered.api.world.extent.Extent;
 import java.util.*;
 
 public class PipeModule implements Module {
-    public static final String MODULE_NAME = "pipes";
     public static final double DEFAULT_SPEED = 1.0 / 20.0;
     public static final int DEFAULT_PIPE_CAPACITY = 4;
     @Getter private final LimeFun plugin;
@@ -55,11 +54,6 @@ public class PipeModule implements Module {
 
     public PipeModule(LimeFun plugin) {
         this.plugin = plugin;
-    }
-
-    @Override
-    public String getModuleName() {
-        return MODULE_NAME;
     }
 
     @Listener
