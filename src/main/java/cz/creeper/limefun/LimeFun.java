@@ -5,6 +5,7 @@ import com.google.inject.Inject;
 import com.google.inject.Injector;
 import cz.creeper.limefun.modules.Module;
 import cz.creeper.limefun.modules.pipe.PipeModule;
+import cz.creeper.limefun.modules.wateringCan.WateringCanModule;
 import lombok.Getter;
 import ninja.leaping.configurate.ConfigurationNode;
 import ninja.leaping.configurate.ConfigurationOptions;
@@ -21,6 +22,7 @@ import org.spongepowered.api.event.game.GameReloadEvent;
 import org.spongepowered.api.event.game.state.GameConstructionEvent;
 import org.spongepowered.api.event.game.state.GameStartedServerEvent;
 import org.spongepowered.api.event.game.state.GameStoppedServerEvent;
+import org.spongepowered.api.plugin.Dependency;
 import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.text.Text;
 
@@ -35,6 +37,12 @@ import java.util.Random;
         description = "Bring things from mods to a server without mods!",
         authors = {
                 "Limeth"
+        },
+        dependencies = {
+                @Dependency(
+                        id = "customitemlibrary",
+                        version = "[0.1,)"
+                )
         }
 )
 public class LimeFun {
@@ -81,6 +89,7 @@ public class LimeFun {
     private void initModules() {
         availableModules.clear();
         initModule(new PipeModule(this));
+        initModule(new WateringCanModule(this));
     }
 
     private void initModule(Module module) {
