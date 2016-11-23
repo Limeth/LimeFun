@@ -1,4 +1,4 @@
-package cz.creeper.limefun.pipe;
+package cz.creeper.limefun.modules.pipe;
 
 import cz.creeper.limefun.LimeFunKeys;
 import lombok.AccessLevel;

@@ -1,11 +1,13 @@
-package cz.creeper.limefun.pipe;
+package cz.creeper.limefun.modules.pipe;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultimap;
 import cz.creeper.limefun.LimeFun;
+import cz.creeper.limefun.modules.Module;
 import cz.creeper.limefun.util.BlockLoc;
 import lombok.Getter;
 import lombok.Setter;
+import ninja.leaping.configurate.ConfigurationNode;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockSnapshot;
 import org.spongepowered.api.block.BlockState;
@@ -24,6 +26,7 @@ import org.spongepowered.api.event.cause.Cause;
 import org.spongepowered.api.event.cause.entity.spawn.BlockSpawnCause;
 import org.spongepowered.api.event.cause.entity.spawn.SpawnTypes;
 import org.spongepowered.api.event.entity.*;
+import org.spongepowered.api.event.game.state.GamePreInitializationEvent;
 import org.spongepowered.api.item.inventory.ItemStackSnapshot;
 import org.spongepowered.api.scheduler.Task;
 import org.spongepowered.api.util.Direction;
@@ -33,7 +36,8 @@ import org.spongepowered.api.world.extent.Extent;
 
 import java.util.*;
 
-public class PipeSystem {
+public class PipeModule implements Module {
+    public static final String MODULE_NAME = "pipes";
     public static final double DEFAULT_SPEED = 1.0 / 20.0;
     public static final int DEFAULT_PIPE_CAPACITY = 4;
     @Getter private final LimeFun plugin;
@@ -49,26 +53,40 @@ public class PipeSystem {
      */
     @Getter @Setter private int pipeCapacity = DEFAULT_PIPE_CAPACITY;  // TODO: Make configurable
 
-    public PipeSystem(LimeFun plugin) {
+    public PipeModule(LimeFun plugin) {
         this.plugin = plugin;
     }
 
+    @Override
+    public String getModuleName() {
+        return MODULE_NAME;
+    }
+
+    @Listener
+    public void onGamePreInitialization(GamePreInitializationEvent event) {
+        Sponge.getDataManager().register(PipeItemData.class, ImmutablePipeItemData.class, new PipeItemManipulatorBuilder());
+    }
+
+    @Override
+    public void load(ConfigurationNode node) {
+        setSpeed(node.getNode("speed").getDouble(PipeModule.DEFAULT_SPEED));
+        setPipeCapacity(node.getNode("capacity").getInt(PipeModule.DEFAULT_PIPE_CAPACITY));
+    }
+
+    @Override
     public void start() {
-        Preconditions.checkArgument(task == null, "PipeSystem already started!");
+        Preconditions.checkArgument(task == null, "PipeModule already started!");
 
         task = Sponge.getScheduler().createTaskBuilder().execute(this::tick)
                 .intervalTicks(1).submit(plugin);
-
-        Sponge.getEventManager().registerListeners(plugin, this);
     }
 
+    @Override
     public void stop() {
-        Preconditions.checkNotNull(task, "PipeSystem not running!");
+        Preconditions.checkNotNull(task, "PipeModule not running!");
 
         task.cancel();
         task = null;
-
-        Sponge.getEventManager().unregisterListeners(this);
     }
 
     public boolean isRunning() {

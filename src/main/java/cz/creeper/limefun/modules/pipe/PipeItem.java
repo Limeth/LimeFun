@@ -1,4 +1,4 @@
-package cz.creeper.limefun.pipe;
+package cz.creeper.limefun.modules.pipe;
 
 import com.flowpowered.math.vector.Vector3d;
 import com.google.common.base.Preconditions;
@@ -35,13 +35,13 @@ import java.util.*;
 @Getter
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class PipeItem {
-    @NonNull private final PipeSystem system;
+    @NonNull private final PipeModule system;
     /** Make sure to use {@link #setPipe(BlockLoc)} */
     @NonNull private BlockLoc<World> pipe;
     @NonNull @Setter private UUID itemId;
     @NonNull @Setter private DyeColor pipeColor;
 
-    public static PipeItem create(PipeSystem system, BlockLoc<World> pipe, Item item, Direction enteringDirection, double distanceTravelledInCurrentPipe) {
+    public static PipeItem create(PipeModule system, BlockLoc<World> pipe, Item item, Direction enteringDirection, double distanceTravelledInCurrentPipe) {
         Util.setItemDisplayOnly(item, true);
         item.offer(new PipeItemData());
         item.offer(LimeFunKeys.PIPE_ENTERING_DIRECTION, enteringDirection);
@@ -71,7 +71,7 @@ public class PipeItem {
         return pipeItem;
     }
 
-    public static PipeItem load(PipeSystem system, Item item) {
+    public static PipeItem load(PipeModule system, Item item) {
         Preconditions.checkArgument(item.get(PipeItemData.class).isPresent(),
                                     "Cannot load a PipeItem from an Item that is missing PipeItemData.");
         Util.setItemDisplayOnly(item, true);

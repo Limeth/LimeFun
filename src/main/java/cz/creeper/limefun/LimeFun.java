@@ -1,11 +1,12 @@
 package cz.creeper.limefun;
 
+import com.google.common.collect.Maps;
 import com.google.inject.Inject;
-import cz.creeper.limefun.pipe.ImmutablePipeItemData;
-import cz.creeper.limefun.pipe.PipeItemData;
-import cz.creeper.limefun.pipe.PipeItemManipulatorBuilder;
-import cz.creeper.limefun.pipe.PipeSystem;
+import com.google.inject.Injector;
+import cz.creeper.limefun.modules.Module;
+import cz.creeper.limefun.modules.pipe.PipeModule;
 import lombok.Getter;
+import ninja.leaping.configurate.ConfigurationNode;
 import ninja.leaping.configurate.ConfigurationOptions;
 import ninja.leaping.configurate.commented.CommentedConfigurationNode;
 import ninja.leaping.configurate.hocon.HoconConfigurationLoader;
@@ -17,15 +18,15 @@ import org.spongepowered.api.command.spec.CommandSpec;
 import org.spongepowered.api.config.DefaultConfig;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.game.GameReloadEvent;
-import org.spongepowered.api.event.game.state.GamePreInitializationEvent;
+import org.spongepowered.api.event.game.state.GameConstructionEvent;
 import org.spongepowered.api.event.game.state.GameStartedServerEvent;
 import org.spongepowered.api.event.game.state.GameStoppedServerEvent;
 import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.text.Text;
-import org.spongepowered.api.text.format.TextColors;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Random;
 
 @Plugin(
@@ -38,32 +39,37 @@ import java.util.Random;
 )
 public class LimeFun {
     @Inject @Getter
+    private Injector injector;
+    @Inject @Getter
     private Logger logger;
     @Inject @DefaultConfig(sharedRoot = true) @Getter
     private Path configPath;
-    @Getter
-    private final PipeSystem pipeSystem = new PipeSystem(this);
+    private final Map<String, Module> availableModules = Maps.newHashMap();
+    private final Map<String, Module> loadedModules = Maps.newHashMap();
     @Getter
     private final Random random = new Random();
 
     @Listener
-    public void onGamePreInitialization(GamePreInitializationEvent event) {
-        Sponge.getDataManager().register(PipeItemData.class, ImmutablePipeItemData.class, new PipeItemManipulatorBuilder());
+    public void onGameConstruction(GameConstructionEvent event) {
+        logger.info("Loading LimeFun...");
+        initModules();
+        loadConfig();
+        registerCommands();
+        logger.info("LimeFun loaded.");
     }
 
     @Listener
     public void onGameServerStart(GameStartedServerEvent event) {
         logger.info("Enabling LimeFun...");
-        loadConfig();
-        registerCommands();
-        pipeSystem.start();
+        loadedModules.values().forEach(Module::start);
         logger.info("LimeFun enabled.");
     }
 
     @Listener
     public void onGameStoppedServer(GameStoppedServerEvent event) {
         logger.info("Disabling LimeFun...");
-        pipeSystem.stop();
+        loadedModules.values().forEach(Module::stop);
+        Sponge.getEventManager().unregisterPluginListeners(this);
         logger.info("LimeFun disabled.");
     }
 
@@ -72,21 +78,51 @@ public class LimeFun {
         loadConfig();
     }
 
+    private void initModules() {
+        availableModules.clear();
+        initModule(new PipeModule(this));
+    }
+
+    private void initModule(Module module) {
+        injector.injectMembers(module);
+        availableModules.put(module.getModuleName(), module);
+    }
+
+    private void loadModule(Module module, ConfigurationNode node) {
+        Sponge.getEventManager().registerListeners(this, module);
+        loadedModules.put(module.getModuleName(), module);
+        module.load(node);
+    }
+
     public void loadConfig() {
         ConfigurationLoader<CommentedConfigurationNode> loader
                 = HoconConfigurationLoader.builder().setPath(configPath).build();
         ConfigurationOptions options = ConfigurationOptions.defaults().setShouldCopyDefaults(true);
-        CommentedConfigurationNode rootNode;
+        CommentedConfigurationNode rootNodeTemp;
 
         try {
-            rootNode = loader.load(options);
+            rootNodeTemp = loader.load(options);
         } catch(IOException e) {
             logger.warn("Could not load the config, creating an empty one: " + e.getLocalizedMessage());
-            rootNode = loader.createEmptyNode(options);
+            rootNodeTemp = loader.createEmptyNode(options);
         }
 
-        pipeSystem.setSpeed(rootNode.getNode("pipes", "speed").getDouble(PipeSystem.DEFAULT_SPEED));
-        pipeSystem.setPipeCapacity(rootNode.getNode("pipes", "capacity").getInt(PipeSystem.DEFAULT_PIPE_CAPACITY));
+        final CommentedConfigurationNode rootNode = rootNodeTemp;
+        CommentedConfigurationNode modulesNode = rootNode.getNode("modules");
+
+        modulesNode.setComment("To enable a module, set the value to `true`. To disable a module, set the value to `false`.");
+
+        loadedModules.clear();
+        availableModules.values().forEach(module -> {
+            String moduleName = module.getModuleName();
+            ConfigurationNode node = rootNode.getNode("modules", moduleName);
+            boolean enabled = node.getNode("enabled").getBoolean(true);
+
+            if(!enabled)
+                return;
+
+            loadModule(module, node);
+        });
 
         try {
             loader.save(rootNode);
