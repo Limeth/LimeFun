@@ -8,6 +8,7 @@ import cz.creeper.customitemlibrary.CustomTool;
 import cz.creeper.customitemlibrary.registry.CustomItemService;
 import cz.creeper.customitemlibrary.registry.CustomToolDefinition;
 import cz.creeper.limefun.LimeFun;
+import cz.creeper.limefun.LimeFunKeys;
 import cz.creeper.limefun.modules.Module;
 import lombok.RequiredArgsConstructor;
 import ninja.leaping.configurate.ConfigurationNode;
@@ -68,7 +69,7 @@ public class WateringCanModule implements Module {
 
     @Override
     public void registerData(DataManager manager) {
-        // TODO
+        manager.register(WateringCanData.class, ImmutableWateringCanData.class, new WateringCanManipulatorBuilder());
     }
 
     @Override
@@ -108,8 +109,12 @@ public class WateringCanModule implements Module {
                 .build()).getRejectedData().forEach(data -> {
             throw new IllegalStateException("Could not offer a display name to the watering can ItemStackSnapshot.");
         });
+        itemStack.offer(new WateringCanData(0));
         return definition = CustomToolDefinition.create(plugin, TYPE_ID, itemStack.createSnapshot(),
-            Lists.newArrayList(MODEL_EMPTY, MODEL_FILLED), Lists.newArrayList());
+            Lists.newArrayList(MODEL_EMPTY, MODEL_FILLED), Lists.newArrayList(
+                    "textures/tools/watering_can_empty.png",
+                    "textures/tools/watering_can_filled.png"
+                ));
     }
 
     @Listener
@@ -120,71 +125,88 @@ public class WateringCanModule implements Module {
                 .flatMap(cis::getCustomItem)
                 .filter(tool -> tool.getDefinition() == definition)
                 .map(CustomTool.class::cast)
-                .ifPresent(tool -> onRightClick(tool, event.getTargetBlock(), event.getCause()));
+                .ifPresent(tool -> {
+                    onRightClick(tool, event.getTargetBlock(), event.getCause());
+                    player.setItemInHand(HandTypes.MAIN_HAND, tool.getItemStack());
+                });
     }
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
     public void onRightClick(CustomTool wateringCan, BlockSnapshot block, Cause cause) {
-        int offset = (int) Math.floor(radius);
-        Location<World> location = block.getLocation().get();
-        World world = location.getExtent();
-        ParticleEffect effect = ParticleEffect.builder()
-                .type(ParticleTypes.WATER_SPLASH)
-                .quantity(1)
-                .build();
-        boolean used = false;
+        ItemStack itemStack = wateringCan.getItemStack();
+        int usesLeft = itemStack.getOrElse(LimeFunKeys.WATERING_CAN_USES_LEFT, 0);
 
-        for(int x = -offset; x <= offset; x++) {
-            for (int z = -offset; z <= offset; z++) {
-                for (int y = -1; y <= 1; y++) {
-                    // not counting in the y axis on purpose
-                    int distanceSquared = x * x + z * z;
+        if(usesLeft > 0) {
+            int offset = (int) Math.floor(radius);
+            Location<World> location = block.getLocation().get();
+            World world = location.getExtent();
+            ParticleEffect effect = ParticleEffect.builder()
+                    .type(ParticleTypes.WATER_SPLASH)
+                    .quantity(1)
+                    .build();
+            boolean used = false;
 
-                    if (distanceSquared < radius * radius) {
-                        Vector3i offsetVector = new Vector3i(x, y, z);
-                        Location<World> currentLocation = location.add(offsetVector);
-                        BlockType currentBlockType = currentLocation.getBlockType();
+            for (int x = -offset; x <= offset; x++) {
+                for (int z = -offset; z <= offset; z++) {
+                    for (int y = -1; y <= 1; y++) {
+                        // not counting in the y axis on purpose
+                        int distanceSquared = x * x + z * z;
 
-                        if (typeWhiteList.contains(currentBlockType)) {
-                            double distance = Math.sqrt(distanceSquared);
-                            double distancePortion = distance / radius;
-                            double growthRateModifier = 1 - distancePortion * distancePortion;
-                            double currentGrowthRate = growthRate * growthRateModifier;
-                            Vector3d particlePoint = currentLocation.getPosition().add(0.5, 0.5, 0.5);
+                        if (distanceSquared < radius * radius) {
+                            Vector3i offsetVector = new Vector3i(x, y, z);
+                            Location<World> currentLocation = location.add(offsetVector);
+                            BlockType currentBlockType = currentLocation.getBlockType();
 
-                            world.spawnParticles(effect, particlePoint);
+                            if (typeWhiteList.contains(currentBlockType)) {
+                                double distance = Math.sqrt(distanceSquared);
+                                double distancePortion = distance / radius;
+                                double growthRateModifier = 1 - distancePortion * distancePortion;
+                                double currentGrowthRate = growthRate * growthRateModifier;
+                                Vector3d particlePoint = currentLocation.getPosition().add(0.5, 0.5, 0.5);
 
-                            for (int i = 0; i < currentGrowthRate; i++) {
-                                currentLocation.addScheduledUpdate(0, 0);
+                                world.spawnParticles(effect, particlePoint);
+
+                                for (int i = 0; i < currentGrowthRate; i++) {
+                                    currentLocation.addScheduledUpdate(0, 0);
+                                }
+
+                                if (!used)
+                                    used = true;
                             }
 
-                            if (!used)
-                                used = true;
-                        }
+                            if (currentBlockType.equals(BlockTypes.FARMLAND)) {
+                                BlockState currentState = currentLocation.getBlock();
+                                int moisture = currentState.get(Keys.MOISTURE).orElseThrow(() ->
+                                        new IllegalStateException("Cannot get the IS_WET property of a FARMLAND block."));
 
-                        if (currentBlockType.equals(BlockTypes.FARMLAND)) {
-                            BlockState currentState = currentLocation.getBlock();
-                            int moisture = currentState.get(Keys.MOISTURE).orElseThrow(() ->
-                                    new IllegalStateException("Cannot get the IS_WET property of a FARMLAND block."));
+                                if (moisture % 8 != 7) {
+                                    currentState = currentState.copy().with(Keys.MOISTURE, 7).get();
+                                    PluginContainer pluginContainer = Sponge.getPluginManager().fromInstance(plugin).get();
 
-                            if (moisture % 8 != 7) {
-                                currentState = currentState.copy().with(Keys.MOISTURE, 7).get();
-                                PluginContainer pluginContainer = Sponge.getPluginManager().fromInstance(plugin).get();
+                                    currentLocation.setBlock(currentState, Cause.source(pluginContainer)
+                                            .named(CAUSE_NAME, cause).build());
+                                }
 
-                                currentLocation.setBlock(currentState, Cause.source(pluginContainer)
-                                        .named(CAUSE_NAME, cause).build());
+                                if (!used)
+                                    used = true;
                             }
-
-                            if (!used)
-                                used = true;
                         }
                     }
                 }
             }
-        }
 
-        if(used) {
-            world.playSound(SoundTypes.ITEM_BUCKET_EMPTY, location.getPosition().add(0.5, 0.5, 0.5), 0.5, 1.2);
+            if (used) {
+                world.playSound(SoundTypes.ITEM_BUCKET_EMPTY, location.getPosition().add(0.5, 0.5, 0.5), 0.5, 1.2);
+
+                itemStack.offer(LimeFunKeys.WATERING_CAN_USES_LEFT, usesLeft - 1);
+
+                if(usesLeft <= 1) {
+                    wateringCan.setModel(MODEL_EMPTY);
+                }
+            }
+        } else {
+            itemStack.offer(LimeFunKeys.WATERING_CAN_USES_LEFT, capacity);
+            wateringCan.setModel(MODEL_FILLED);
         }
     }
 

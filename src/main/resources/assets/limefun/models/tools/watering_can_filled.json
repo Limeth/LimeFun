@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/handheld",
   "textures": {
-    "layer0": "customitemlibrary:tools/watering_can_filled"
+    "layer0": "limefun:tools/watering_can_filled"
   }
 }
