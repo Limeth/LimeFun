@@ -16,6 +16,7 @@ import org.spongepowered.api.block.BlockSnapshot;
 import org.spongepowered.api.block.BlockState;
 import org.spongepowered.api.block.BlockType;
 import org.spongepowered.api.block.BlockTypes;
+import org.spongepowered.api.data.DataManager;
 import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.data.type.HandTypes;
 import org.spongepowered.api.effect.particle.ParticleEffect;
@@ -66,6 +67,11 @@ public class WateringCanModule implements Module {
     private CustomToolDefinition definition;
 
     @Override
+    public void registerData(DataManager manager) {
+        // TODO
+    }
+
+    @Override
     public void load(ConfigurationNode node) {
         capacity = node.getNode("capacity").getInt(DEFAULT_CAPACITY);
         radius = node.getNode("radius").getDouble(DEFAULT_RADIUS);
@@ -87,7 +93,6 @@ public class WateringCanModule implements Module {
                     .map(Optional::get)
                     .collect(Collectors.toList());
         }
-        System.out.println(typeWhiteList);
     }
 
     @Listener

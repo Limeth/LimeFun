@@ -15,6 +15,7 @@ import org.spongepowered.api.block.BlockState;
 import org.spongepowered.api.block.BlockTypes;
 import org.spongepowered.api.block.tileentity.carrier.Dropper;
 import org.spongepowered.api.block.tileentity.carrier.Hopper;
+import org.spongepowered.api.data.DataManager;
 import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.entity.Entity;
 import org.spongepowered.api.entity.EntityTypes;
@@ -27,7 +28,6 @@ import org.spongepowered.api.event.cause.Cause;
 import org.spongepowered.api.event.cause.entity.spawn.BlockSpawnCause;
 import org.spongepowered.api.event.cause.entity.spawn.SpawnTypes;
 import org.spongepowered.api.event.entity.*;
-import org.spongepowered.api.event.game.state.GamePreInitializationEvent;
 import org.spongepowered.api.item.inventory.ItemStackSnapshot;
 import org.spongepowered.api.scheduler.Task;
 import org.spongepowered.api.util.Direction;
@@ -54,9 +54,9 @@ public class PipeModule implements Module {
      */
     @Getter @Setter private int pipeCapacity = DEFAULT_PIPE_CAPACITY;  // TODO: Make configurable
 
-    @Listener
-    public void onGamePreInitialization(GamePreInitializationEvent event) {
-        Sponge.getDataManager().register(PipeItemData.class, ImmutablePipeItemData.class, new PipeItemManipulatorBuilder());
+    @Override
+    public void registerData(DataManager manager) {
+        manager.register(PipeItemData.class, ImmutablePipeItemData.class, new PipeItemManipulatorBuilder());
     }
 
     @Override

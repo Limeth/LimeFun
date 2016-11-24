@@ -1,6 +1,7 @@
 package cz.creeper.limefun.modules;
 
 import ninja.leaping.configurate.ConfigurationNode;
+import org.spongepowered.api.data.DataManager;
 
 public interface Module {
     default String getModuleName() {
@@ -15,6 +16,7 @@ public interface Module {
         return className.substring(secondLastIndex + 1, lastIndex);
     }
 
+    void registerData(DataManager manager);
     void load(ConfigurationNode node);
     void start();
     void stop();

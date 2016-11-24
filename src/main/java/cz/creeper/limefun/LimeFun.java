@@ -18,11 +18,10 @@ import org.spongepowered.api.Sponge;
 import org.spongepowered.api.command.CommandResult;
 import org.spongepowered.api.command.spec.CommandSpec;
 import org.spongepowered.api.config.DefaultConfig;
+import org.spongepowered.api.data.DataManager;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.game.GameReloadEvent;
-import org.spongepowered.api.event.game.state.GameConstructionEvent;
-import org.spongepowered.api.event.game.state.GameStartedServerEvent;
-import org.spongepowered.api.event.game.state.GameStoppedServerEvent;
+import org.spongepowered.api.event.game.state.*;
 import org.spongepowered.api.plugin.Dependency;
 import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.text.Text;
@@ -59,9 +58,16 @@ public class LimeFun {
     private final Random random = new Random();
 
     @Listener
-    public void onGameConstruction(GameConstructionEvent event) {
-        logger.info("Loading LimeFun...");
+    public void onGamePreInitialization(GamePreInitializationEvent event) {
+        DataManager manager = Sponge.getDataManager();
+
         initModules();
+        availableModules.values().forEach(module -> module.registerData(manager));
+    }
+
+    @Listener
+    public void onGameInitialization(GameInitializationEvent event) {
+        logger.info("Loading LimeFun...");
         loadConfig();
         registerCommands();
         logger.info("LimeFun loaded.");
