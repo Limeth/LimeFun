@@ -25,15 +25,19 @@ import org.spongepowered.api.effect.particle.ParticleTypes;
 import org.spongepowered.api.effect.sound.SoundTypes;
 import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.event.Listener;
+import org.spongepowered.api.event.action.InteractEvent;
 import org.spongepowered.api.event.block.InteractBlockEvent;
 import org.spongepowered.api.event.cause.Cause;
 import org.spongepowered.api.event.filter.cause.First;
+import org.spongepowered.api.event.filter.type.Include;
 import org.spongepowered.api.event.game.state.GamePostInitializationEvent;
+import org.spongepowered.api.event.item.inventory.InteractItemEvent;
 import org.spongepowered.api.item.ItemTypes;
 import org.spongepowered.api.item.inventory.ItemStack;
 import org.spongepowered.api.plugin.PluginContainer;
 import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.format.TextColors;
+import org.spongepowered.api.util.blockray.BlockRay;
 import org.spongepowered.api.world.Location;
 import org.spongepowered.api.world.World;
 
@@ -118,95 +122,108 @@ public class WateringCanModule implements Module {
     }
 
     @Listener
-    public void onInteractBlock(InteractBlockEvent.Secondary.MainHand event, @First Player player) {
+    @Include({
+            InteractBlockEvent.Secondary.MainHand.class,  // TODO: Use only the item event and ray-trace the whitelisted blocks?
+            InteractItemEvent.Secondary.MainHand.class,
+    })
+    public void onInteractBlock(InteractEvent event, @First Player player) {
         CustomItemService cis = LimeFun.getCustomItemService();
+        player.sendMessage(Text.of(event.toString()));
 
         player.getItemInHand(HandTypes.MAIN_HAND)
                 .flatMap(cis::getCustomItem)
                 .filter(tool -> tool.getDefinition() == definition)
                 .map(CustomTool.class::cast)
                 .ifPresent(tool -> {
-                    onRightClick(tool, event.getTargetBlock(), event.getCause());
+                    onRightClick(event, player, tool);
                     player.setItemInHand(HandTypes.MAIN_HAND, tool.getItemStack());
                 });
     }
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
-    public void onRightClick(CustomTool wateringCan, BlockSnapshot block, Cause cause) {
+    public void onRightClick(InteractEvent event, Player player, CustomTool wateringCan) {
         ItemStack itemStack = wateringCan.getItemStack();
-        int usesLeft = itemStack.getOrElse(LimeFunKeys.WATERING_CAN_USES_LEFT, 0);
+        BlockRay waterRay = BlockRay.from(player).stopFilter(BlockRay.blockTypeFilter(BlockTypes.WATER)).distanceLimit(5).narrowPhase(true).build();
 
-        if(usesLeft > 0) {
-            int offset = (int) Math.floor(radius);
-            Location<World> location = block.getLocation().get();
-            World world = location.getExtent();
-            ParticleEffect effect = ParticleEffect.builder()
-                    .type(ParticleTypes.WATER_SPLASH)
-                    .quantity(1)
-                    .build();
-            boolean used = false;
+        if(waterRay.end().isPresent()) {
+            itemStack.offer(LimeFunKeys.WATERING_CAN_USES_LEFT, capacity);
+            wateringCan.setModel(MODEL_FILLED);
+            return;
+        }
 
-            for (int x = -offset; x <= offset; x++) {
-                for (int z = -offset; z <= offset; z++) {
-                    for (int y = -1; y <= 1; y++) {
-                        // not counting in the y axis on purpose
-                        int distanceSquared = x * x + z * z;
+        if(event instanceof InteractBlockEvent) {
+            BlockSnapshot block = ((InteractBlockEvent) event).getTargetBlock();
+            int usesLeft = itemStack.getOrElse(LimeFunKeys.WATERING_CAN_USES_LEFT, 0);
 
-                        if (distanceSquared < radius * radius) {
-                            Vector3i offsetVector = new Vector3i(x, y, z);
-                            Location<World> currentLocation = location.add(offsetVector);
-                            BlockType currentBlockType = currentLocation.getBlockType();
+            if(usesLeft > 0) {
+                int offset = (int) Math.floor(radius);
+                Location<World> location = block.getLocation().get();
+                World world = location.getExtent();
+                ParticleEffect effect = ParticleEffect.builder()
+                        .type(ParticleTypes.WATER_SPLASH)
+                        .quantity(1)
+                        .build();
+                boolean used = false;
 
-                            if (typeWhiteList.contains(currentBlockType)) {
-                                double distance = Math.sqrt(distanceSquared);
-                                double distancePortion = distance / radius;
-                                double growthRateModifier = 1 - distancePortion * distancePortion;
-                                double currentGrowthRate = growthRate * growthRateModifier;
-                                Vector3d particlePoint = currentLocation.getPosition().add(0.5, 0.5, 0.5);
+                for (int x = -offset; x <= offset; x++) {
+                    for (int z = -offset; z <= offset; z++) {
+                        for (int y = -1; y <= 1; y++) {
+                            // not counting in the y axis on purpose
+                            int distanceSquared = x * x + z * z;
 
-                                world.spawnParticles(effect, particlePoint);
+                            if (distanceSquared < radius * radius) {
+                                Vector3i offsetVector = new Vector3i(x, y, z);
+                                Location<World> currentLocation = location.add(offsetVector);
+                                BlockType currentBlockType = currentLocation.getBlockType();
 
-                                for (int i = 0; i < currentGrowthRate; i++) {
-                                    currentLocation.addScheduledUpdate(0, 0);
+                                if (typeWhiteList.contains(currentBlockType)) {
+                                    double distance = Math.sqrt(distanceSquared);
+                                    double distancePortion = distance / radius;
+                                    double growthRateModifier = 1 - distancePortion * distancePortion;
+                                    double currentGrowthRate = growthRate * growthRateModifier;
+                                    Vector3d particlePoint = currentLocation.getPosition().add(0.5, 0.5, 0.5);
+
+                                    world.spawnParticles(effect, particlePoint);
+
+                                    for (int i = 0; i < currentGrowthRate; i++) {
+                                        currentLocation.addScheduledUpdate(0, 0);
+                                    }
+
+                                    if (!used)
+                                        used = true;
                                 }
 
-                                if (!used)
-                                    used = true;
-                            }
+                                if (currentBlockType.equals(BlockTypes.FARMLAND)) {
+                                    BlockState currentState = currentLocation.getBlock();
+                                    int moisture = currentState.get(Keys.MOISTURE).orElseThrow(() ->
+                                            new IllegalStateException("Cannot get the IS_WET property of a FARMLAND block."));
 
-                            if (currentBlockType.equals(BlockTypes.FARMLAND)) {
-                                BlockState currentState = currentLocation.getBlock();
-                                int moisture = currentState.get(Keys.MOISTURE).orElseThrow(() ->
-                                        new IllegalStateException("Cannot get the IS_WET property of a FARMLAND block."));
+                                    if (moisture % 8 != 7) {
+                                        currentState = currentState.copy().with(Keys.MOISTURE, 7).get();
+                                        PluginContainer pluginContainer = Sponge.getPluginManager().fromInstance(plugin).get();
 
-                                if (moisture % 8 != 7) {
-                                    currentState = currentState.copy().with(Keys.MOISTURE, 7).get();
-                                    PluginContainer pluginContainer = Sponge.getPluginManager().fromInstance(plugin).get();
+                                        currentLocation.setBlock(currentState, Cause.source(pluginContainer)
+                                                .named(CAUSE_NAME, event.getCause()).build());
+                                    }
 
-                                    currentLocation.setBlock(currentState, Cause.source(pluginContainer)
-                                            .named(CAUSE_NAME, cause).build());
+                                    if (!used)
+                                        used = true;
                                 }
-
-                                if (!used)
-                                    used = true;
                             }
                         }
                     }
                 }
-            }
 
-            if (used) {
-                world.playSound(SoundTypes.ITEM_BUCKET_EMPTY, location.getPosition().add(0.5, 0.5, 0.5), 0.5, 1.2);
+                if (used) {
+                    world.playSound(SoundTypes.ITEM_BUCKET_EMPTY, location.getPosition().add(0.5, 0.5, 0.5), 0.5, 1.2);
 
-                itemStack.offer(LimeFunKeys.WATERING_CAN_USES_LEFT, usesLeft - 1);
+                    itemStack.offer(LimeFunKeys.WATERING_CAN_USES_LEFT, usesLeft - 1);
 
-                if(usesLeft <= 1) {
-                    wateringCan.setModel(MODEL_EMPTY);
+                    if (usesLeft <= 1) {
+                        wateringCan.setModel(MODEL_EMPTY);
+                    }
                 }
             }
-        } else {
-            itemStack.offer(LimeFunKeys.WATERING_CAN_USES_LEFT, capacity);
-            wateringCan.setModel(MODEL_FILLED);
         }
     }
 
