@@ -3,6 +3,7 @@ package cz.creeper.limefun;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 import com.google.inject.Injector;
+import cz.creeper.customitemlibrary.registry.CustomItemService;
 import cz.creeper.limefun.modules.Module;
 import cz.creeper.limefun.modules.pipe.PipeModule;
 import cz.creeper.limefun.modules.wateringCan.WateringCanModule;
@@ -153,5 +154,10 @@ public class LimeFun {
                 .build();
 
         Sponge.getCommandManager().register(this, lfSpec, "limefun", "lf");
+    }
+
+    public static CustomItemService getCustomItemService() {
+        return Sponge.getServiceManager().provide(CustomItemService.class)
+                .orElseThrow(() -> new IllegalStateException("Could not access the CustomItemService."));
     }
 }
