@@ -25,11 +25,8 @@ import org.spongepowered.api.effect.particle.ParticleTypes;
 import org.spongepowered.api.effect.sound.SoundTypes;
 import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.event.Listener;
-import org.spongepowered.api.event.action.InteractEvent;
-import org.spongepowered.api.event.block.InteractBlockEvent;
 import org.spongepowered.api.event.cause.Cause;
 import org.spongepowered.api.event.filter.cause.First;
-import org.spongepowered.api.event.filter.type.Include;
 import org.spongepowered.api.event.game.state.GamePostInitializationEvent;
 import org.spongepowered.api.event.item.inventory.InteractItemEvent;
 import org.spongepowered.api.item.ItemTypes;
@@ -38,6 +35,7 @@ import org.spongepowered.api.plugin.PluginContainer;
 import org.spongepowered.api.text.Text;
 import org.spongepowered.api.text.format.TextColors;
 import org.spongepowered.api.util.blockray.BlockRay;
+import org.spongepowered.api.util.blockray.BlockRayHit;
 import org.spongepowered.api.world.Location;
 import org.spongepowered.api.world.World;
 
@@ -100,9 +98,15 @@ public class WateringCanModule implements Module {
         }
     }
 
+    @Override
+    public void start() {}
+
+    @Override
+    public void stop() {}
+
     @Listener
     public void onGamePostInitialization(GamePostInitializationEvent event) {
-        LimeFun.getCustomItemService().register(createDefinition());
+        LimeFun.getCustomItemService().register(definition = createDefinition());
     }
 
     private CustomToolDefinition createDefinition() {
@@ -114,7 +118,7 @@ public class WateringCanModule implements Module {
             throw new IllegalStateException("Could not offer a display name to the watering can ItemStackSnapshot.");
         });
         itemStack.offer(new WateringCanData(0));
-        return definition = CustomToolDefinition.create(plugin, TYPE_ID, itemStack.createSnapshot(),
+        return CustomToolDefinition.create(plugin, TYPE_ID, itemStack.createSnapshot(),
             Lists.newArrayList(MODEL_EMPTY, MODEL_FILLED), Lists.newArrayList(
                     "textures/tools/watering_can_empty.png",
                     "textures/tools/watering_can_filled.png"
@@ -122,114 +126,118 @@ public class WateringCanModule implements Module {
     }
 
     @Listener
-    @Include({
-            InteractBlockEvent.Secondary.MainHand.class,  // TODO: Use only the item event and ray-trace the whitelisted blocks?
-            InteractItemEvent.Secondary.MainHand.class,
-    })
-    public void onInteractBlock(InteractEvent event, @First Player player) {
+    public void onInteractBlock(InteractItemEvent.Secondary.MainHand event, @First Player player) {
         CustomItemService cis = LimeFun.getCustomItemService();
-        player.sendMessage(Text.of(event.toString()));
 
         player.getItemInHand(HandTypes.MAIN_HAND)
                 .flatMap(cis::getCustomItem)
                 .filter(tool -> tool.getDefinition() == definition)
                 .map(CustomTool.class::cast)
                 .ifPresent(tool -> {
-                    onRightClick(event, player, tool);
+                    Cause cause = event.getCause();
+                    // TODO: Change to NamedCause.HIT_TARGET once it's available
+                    BlockSnapshot clickedBlock = cause.get("HitTarget", BlockSnapshot.class)
+                            .orElse(BlockSnapshot.NONE);
+                    onRightClick(clickedBlock, player, tool, cause);
                     player.setItemInHand(HandTypes.MAIN_HAND, tool.getItemStack());
                 });
     }
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
-    public void onRightClick(InteractEvent event, Player player, CustomTool wateringCan) {
+    public void onRightClick(BlockSnapshot clickedBlock, Player player, CustomTool wateringCan, Cause cause) {
         ItemStack itemStack = wateringCan.getItemStack();
-        BlockRay waterRay = BlockRay.from(player).stopFilter(BlockRay.blockTypeFilter(BlockTypes.WATER)).distanceLimit(5).narrowPhase(true).build();
+        int usesLeft = itemStack.getOrElse(LimeFunKeys.WATERING_CAN_USES_LEFT, 0);
 
-        if(waterRay.end().isPresent()) {
-            itemStack.offer(LimeFunKeys.WATERING_CAN_USES_LEFT, capacity);
-            wateringCan.setModel(MODEL_FILLED);
-            return;
+        if(usesLeft < capacity) {
+            Optional<BlockRayHit<World>> water = BlockRay.from(player).skipFilter(BlockRay.blockTypeFilter(BlockTypes.WATER)).stopFilter(hit -> {
+                BlockType type = hit.getLocation().getBlockType();
+                return type == BlockTypes.AIR || type == BlockTypes.WATER;
+            }).distanceLimit(5).narrowPhase(true).build().end();
+
+            if (water.isPresent()) {
+                Location<World> location = water.get().getLocation();
+                World world = location.getExtent();
+
+                itemStack.offer(LimeFunKeys.WATERING_CAN_USES_LEFT, capacity);
+                wateringCan.setModel(MODEL_FILLED);
+                world.playSound(SoundTypes.ITEM_BUCKET_FILL, location.getPosition(), 0.5, 1.0);
+                return;
+            }
         }
 
-        if(event instanceof InteractBlockEvent) {
-            BlockSnapshot block = ((InteractBlockEvent) event).getTargetBlock();
-            int usesLeft = itemStack.getOrElse(LimeFunKeys.WATERING_CAN_USES_LEFT, 0);
+        if(usesLeft > 0 && clickedBlock != BlockSnapshot.NONE) {
+            int offset = (int) Math.floor(radius);
+            Location<World> location = clickedBlock.getLocation().get();
+            World world = location.getExtent();
+            ParticleEffect effect = ParticleEffect.builder()
+                    .type(ParticleTypes.WATER_SPLASH)
+                    .quantity(1)
+                    .build();
+            boolean used = false;
 
-            if(usesLeft > 0) {
-                int offset = (int) Math.floor(radius);
-                Location<World> location = block.getLocation().get();
-                World world = location.getExtent();
-                ParticleEffect effect = ParticleEffect.builder()
-                        .type(ParticleTypes.WATER_SPLASH)
-                        .quantity(1)
-                        .build();
-                boolean used = false;
+            for (int x = -offset; x <= offset; x++) {
+                for (int z = -offset; z <= offset; z++) {
+                    for (int y = -1; y <= 1; y++) {
+                        // not counting in the y axis on purpose
+                        int distanceSquared = x * x + z * z;
 
-                for (int x = -offset; x <= offset; x++) {
-                    for (int z = -offset; z <= offset; z++) {
-                        for (int y = -1; y <= 1; y++) {
-                            // not counting in the y axis on purpose
-                            int distanceSquared = x * x + z * z;
+                        if (distanceSquared < radius * radius) {
+                            Vector3i offsetVector = new Vector3i(x, y, z);
+                            Location<World> currentLocation = location.add(offsetVector);
+                            BlockType currentBlockType = currentLocation.getBlockType();
 
-                            if (distanceSquared < radius * radius) {
-                                Vector3i offsetVector = new Vector3i(x, y, z);
-                                Location<World> currentLocation = location.add(offsetVector);
-                                BlockType currentBlockType = currentLocation.getBlockType();
+                            if (typeWhiteList.contains(currentBlockType)) {
+                                double distance = Math.sqrt(distanceSquared);
+                                double distancePortion = distance / radius;
+                                double growthRateModifier = 1 - distancePortion * distancePortion;
+                                double currentGrowthRate = growthRate * growthRateModifier;
+                                Vector3d particlePoint = currentLocation.getPosition().add(0.5, 0.5, 0.5);
 
-                                if (typeWhiteList.contains(currentBlockType)) {
-                                    double distance = Math.sqrt(distanceSquared);
-                                    double distancePortion = distance / radius;
-                                    double growthRateModifier = 1 - distancePortion * distancePortion;
-                                    double currentGrowthRate = growthRate * growthRateModifier;
-                                    Vector3d particlePoint = currentLocation.getPosition().add(0.5, 0.5, 0.5);
+                                world.spawnParticles(effect, particlePoint);
 
-                                    world.spawnParticles(effect, particlePoint);
-
-                                    for (int i = 0; i < currentGrowthRate; i++) {
-                                        currentLocation.addScheduledUpdate(0, 0);
-                                    }
-
-                                    if (!used)
-                                        used = true;
+                                for (int i = 0; i < currentGrowthRate; i++) {
+                                    currentLocation.addScheduledUpdate(0, 0);
                                 }
 
-                                if (currentBlockType.equals(BlockTypes.FARMLAND)) {
-                                    BlockState currentState = currentLocation.getBlock();
-                                    int moisture = currentState.get(Keys.MOISTURE).orElseThrow(() ->
-                                            new IllegalStateException("Cannot get the IS_WET property of a FARMLAND block."));
+                                if (!used)
+                                    used = true;
+                            }
 
-                                    if (moisture % 8 != 7) {
-                                        currentState = currentState.copy().with(Keys.MOISTURE, 7).get();
-                                        PluginContainer pluginContainer = Sponge.getPluginManager().fromInstance(plugin).get();
+                            if (currentBlockType.equals(BlockTypes.FARMLAND)) {
+                                BlockState currentState = currentLocation.getBlock();
+                                int moisture = currentState.get(Keys.MOISTURE).orElseThrow(() ->
+                                        new IllegalStateException("Cannot get the IS_WET property of a FARMLAND block."));
 
-                                        currentLocation.setBlock(currentState, Cause.source(pluginContainer)
-                                                .named(CAUSE_NAME, event.getCause()).build());
-                                    }
+                                if (moisture % 8 != 7) {
+                                    currentState = currentState.copy().with(Keys.MOISTURE, 7).get();
+                                    PluginContainer pluginContainer = Sponge.getPluginManager().fromInstance(plugin).get();
 
-                                    if (!used)
-                                        used = true;
+                                    currentLocation.setBlock(currentState, Cause.source(pluginContainer)
+                                            .named(CAUSE_NAME, cause).build());
                                 }
+
+                                if (!used)
+                                    used = true;
                             }
                         }
                     }
                 }
+            }
 
-                if (used) {
-                    world.playSound(SoundTypes.ITEM_BUCKET_EMPTY, location.getPosition().add(0.5, 0.5, 0.5), 0.5, 1.2);
+            if (used) {
+                itemStack.offer(LimeFunKeys.WATERING_CAN_USES_LEFT, usesLeft - 1);
 
-                    itemStack.offer(LimeFunKeys.WATERING_CAN_USES_LEFT, usesLeft - 1);
+                double pitch;
 
-                    if (usesLeft <= 1) {
-                        wateringCan.setModel(MODEL_EMPTY);
-                    }
+                if (usesLeft <= 1) {
+                    wateringCan.setModel(MODEL_EMPTY);
+                    pitch = 1.0;
+                } else {
+                    pitch = 1.2;
                 }
+
+                world.playSound(SoundTypes.ITEM_BUCKET_EMPTY, location.getPosition().add(0.5, 0.5, 0.5), 0.5, pitch);
             }
         }
     }
-
-    @Override
-    public void start() {}
-
-    @Override
-    public void stop() {}
 }
