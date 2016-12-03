@@ -126,7 +126,7 @@ public class WateringCanModule implements Module {
     }
 
     @Listener
-    public void onInteractBlock(InteractItemEvent.Secondary.MainHand event, @First Player player) {
+    public void onInteractItem(InteractItemEvent.Secondary.MainHand event, @First Player player) {
         CustomItemService cis = LimeFun.getCustomItemService();
 
         player.getItemInHand(HandTypes.MAIN_HAND)
