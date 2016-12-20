@@ -3,7 +3,7 @@ package cz.creeper.limefun;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
 import com.google.inject.Injector;
-import cz.creeper.customitemlibrary.registry.CustomItemService;
+import cz.creeper.customitemlibrary.CustomItemService;
 import cz.creeper.limefun.modules.Module;
 import cz.creeper.limefun.modules.pipe.PipeModule;
 import cz.creeper.limefun.modules.wateringCan.WateringCanModule;
@@ -21,7 +21,10 @@ import org.spongepowered.api.config.DefaultConfig;
 import org.spongepowered.api.data.DataManager;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.game.GameReloadEvent;
-import org.spongepowered.api.event.game.state.*;
+import org.spongepowered.api.event.game.state.GameInitializationEvent;
+import org.spongepowered.api.event.game.state.GamePreInitializationEvent;
+import org.spongepowered.api.event.game.state.GameStartedServerEvent;
+import org.spongepowered.api.event.game.state.GameStoppedServerEvent;
 import org.spongepowered.api.plugin.Dependency;
 import org.spongepowered.api.plugin.Plugin;
 import org.spongepowered.api.text.Text;
@@ -41,7 +44,7 @@ import java.util.Random;
         dependencies = {
                 @Dependency(
                         id = "customitemlibrary",
-                        version = "[0.1,)"
+                        version = "[0.2,)"
                 )
         }
 )

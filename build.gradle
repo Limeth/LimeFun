@@ -20,7 +20,7 @@ repositories {
 
 dependencies {
     compile 'org.spongepowered:spongeapi:5.1.0-20161023.181826-1'
-    compile 'com.github.Limeth:CustomItemLibrary:v0.1.0'
+    compile 'com.github.Limeth:CustomItemLibrary:v0.2.0'
     compileOnly "org.projectlombok:lombok:1.16.10"
 }
 

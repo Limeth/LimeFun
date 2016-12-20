@@ -4,9 +4,10 @@ import com.flowpowered.math.vector.Vector3d;
 import com.flowpowered.math.vector.Vector3i;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import cz.creeper.customitemlibrary.CustomTool;
-import cz.creeper.customitemlibrary.registry.CustomItemService;
-import cz.creeper.customitemlibrary.registry.CustomToolDefinition;
+import cz.creeper.customitemlibrary.CustomItemService;
+import cz.creeper.customitemlibrary.feature.CustomFeatureDefinition;
+import cz.creeper.customitemlibrary.feature.item.tool.CustomTool;
+import cz.creeper.customitemlibrary.feature.item.tool.CustomToolDefinition;
 import cz.creeper.limefun.LimeFun;
 import cz.creeper.limefun.LimeFunKeys;
 import cz.creeper.limefun.modules.Module;
@@ -118,11 +119,15 @@ public class WateringCanModule implements Module {
             throw new IllegalStateException("Could not offer a display name to the watering can ItemStackSnapshot.");
         });
         itemStack.offer(new WateringCanData(0));
-        return CustomToolDefinition.create(plugin, TYPE_ID, itemStack.createSnapshot(),
-            Lists.newArrayList(MODEL_EMPTY, MODEL_FILLED), Lists.newArrayList(
-                    "textures/tools/watering_can_empty.png",
-                    "textures/tools/watering_can_filled.png"
-                ));
+        return CustomFeatureDefinition.itemToolBuilder()
+                .plugin(plugin)
+                .typeId(TYPE_ID)
+                .itemStackSnapshot(itemStack.createSnapshot())
+                .defaultModel(MODEL_EMPTY)
+                .additionalModel(MODEL_FILLED)
+                .asset("textures/tools/watering_can_empty.png")
+                .asset("textures/tools/watering_can_filled.png")
+                .build();
     }
 
     @Listener
@@ -130,7 +135,7 @@ public class WateringCanModule implements Module {
         CustomItemService cis = LimeFun.getCustomItemService();
 
         player.getItemInHand(HandTypes.MAIN_HAND)
-                .flatMap(cis::getCustomItem)
+                .flatMap(cis::getItem)
                 .filter(tool -> tool.getDefinition() == definition)
                 .map(CustomTool.class::cast)
                 .ifPresent(tool -> {
@@ -139,13 +144,13 @@ public class WateringCanModule implements Module {
                     BlockSnapshot clickedBlock = cause.get("HitTarget", BlockSnapshot.class)
                             .orElse(BlockSnapshot.NONE);
                     onRightClick(clickedBlock, player, tool, cause);
-                    player.setItemInHand(HandTypes.MAIN_HAND, tool.getItemStack());
+                    player.setItemInHand(HandTypes.MAIN_HAND, tool.getDataHolder());
                 });
     }
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
     public void onRightClick(BlockSnapshot clickedBlock, Player player, CustomTool wateringCan, Cause cause) {
-        ItemStack itemStack = wateringCan.getItemStack();
+        ItemStack itemStack = wateringCan.getDataHolder();
         int usesLeft = itemStack.getOrElse(LimeFunKeys.WATERING_CAN_USES_LEFT, 0);
 
         if(usesLeft < capacity) {
