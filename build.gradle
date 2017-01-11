@@ -1,17 +1,44 @@
-plugins {
-    id 'org.spongepowered.plugin' version '0.7'
-    id 'java'
+buildscript {
+    repositories {
+        jcenter()
+        maven {
+            name = "forge"
+            url = "http://files.minecraftforge.net/maven"
+        }
+        maven {
+            url = "https://plugins.gradle.org/m2/"
+        }
+    }
+    dependencies {
+        classpath "net.minecraftforge.gradle:ForgeGradle:2.2-SNAPSHOT"
+        classpath "gradle.plugin.org.spongepowered:spongegradle:0.6"
+    }
 }
 
-group = pluginGroup
-version = pluginVersion
+apply plugin: "net.minecraftforge.gradle.forge"
+apply plugin: "org.spongepowered.plugin"
+
+targetCompatibility = 1.8
+sourceCompatibility = 1.8
+version = modVersion
+group = modGroup
+archivesBaseName = modBaseName
+
+minecraft {
+    version = project.forgeVersion
+    runDir = "run"
+
+    // the mappings can be changed at any time, and must be in the following format.
+    // snapshot_YYYYMMDD   snapshot are built nightly.
+    // stable_#            stables are built at the discretion of the MCP team.
+    // Use non-default mappings at your own risk. they may not always work.
+    // simply re-run your setup task after changing the mappings to update your workspace.
+    mappings = project.mcpVersion
+    // makeObfSourceJar = false // an Srg named sources jar is made by default. uncomment this to disable.
+}
 
 repositories {
     mavenCentral()
-    maven {
-        name = 'sponge'
-        url = 'http://repo.spongepowered.org/maven'
-    }
     maven {
         name = 'jitpack'
         url = 'https://jitpack.io'
@@ -19,9 +46,26 @@ repositories {
 }
 
 dependencies {
-    compile 'org.spongepowered:spongeapi:5.1.0-20161023.181826-1'
-    compile 'com.github.Limeth:CustomItemLibrary:v0.2.0'
+    compile 'org.spongepowered:spongeapi:6.0.0-20170108.105512-31'
+    compile 'com.github.Limeth:CustomItemLibrary:v0.4.0'
     compileOnly "org.projectlombok:lombok:1.16.10"
 }
 
-sponge.plugin.id = pluginId
+processResources {
+    // this will ensure that this task is redone when the versions change.
+    inputs.property "version", project.version
+    inputs.property "mcversion", project.minecraft.version
+
+    // replace stuff in mcmod.info, nothing else
+    from(sourceSets.main.resources.srcDirs) {
+        include "mcmod.info"
+
+        // replace version and mcversion
+        expand "version": project.version, "mcversion": project.minecraft.version
+    }
+
+    // copy everything else, thats not the mcmod.info
+    from(sourceSets.main.resources.srcDirs) {
+        exclude "mcmod.info"
+    }
+}

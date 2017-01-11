@@ -125,8 +125,8 @@ public class WateringCanModule implements Module {
                 .itemStackSnapshot(itemStack.createSnapshot())
                 .defaultModel(MODEL_EMPTY)
                 .additionalModel(MODEL_FILLED)
-                .asset("textures/tools/watering_can_empty.png")
-                .asset("textures/tools/watering_can_filled.png")
+                .additionalAsset("textures/tools/watering_can_empty.png")
+                .additionalAsset("textures/tools/watering_can_filled.png")
                 .build();
     }
 
