@@ -43,10 +43,15 @@ repositories {
         name = 'jitpack'
         url = 'https://jitpack.io'
     }
+    maven {
+        name = 'sponge'
+        url = 'https://repo.spongepowered.org/maven'
+    }
 }
 
 dependencies {
-    compile 'org.spongepowered:spongeapi:6.0.0-20170108.105512-31'
+    // SpongeCommon from https://repo.spongepowered.org/maven/org/spongepowered/spongecommon/
+    compile 'org.spongepowered:spongecommon:6.0.0-SNAPSHOT:dev'
     compile 'com.github.Limeth:CustomItemLibrary:v0.4.0'
     compileOnly "org.projectlombok:lombok:1.16.10"
 }
