@@ -87,6 +87,9 @@ public class MiningSourceDistributor {
             sourceToProductLeft.put(nextProductId, sourceToProductLeft.get(nextProductId) - 1);
         }
 
+        if(totalProduct != null)
+            totalProduct--;
+
         return nextProduct;
     }
 
