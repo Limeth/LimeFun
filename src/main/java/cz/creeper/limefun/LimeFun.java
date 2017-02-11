@@ -1,18 +1,27 @@
 package cz.creeper.limefun;
 
+import com.flowpowered.math.vector.Vector2i;
 import com.google.common.collect.Maps;
+import com.google.common.reflect.TypeToken;
 import com.google.inject.Inject;
 import com.google.inject.Injector;
 import cz.creeper.customitemlibrary.CustomItemService;
+import cz.creeper.limefun.manager.MiningSourceManager;
+import cz.creeper.limefun.manager.MiningSourceManagerSerializer;
+import cz.creeper.limefun.manager.MiningSourceWorldManager;
+import cz.creeper.limefun.manager.MiningSourceWorldManagerSerializer;
 import cz.creeper.limefun.modules.Module;
 import cz.creeper.limefun.modules.pipe.PipeModule;
 import cz.creeper.limefun.modules.wateringCan.WateringCanModule;
+import cz.creeper.limefun.registry.miningSource.MiningSource;
+import cz.creeper.limefun.registry.miningSource.MiningSourcesRegistryModule;
 import lombok.Getter;
 import ninja.leaping.configurate.ConfigurationNode;
 import ninja.leaping.configurate.ConfigurationOptions;
 import ninja.leaping.configurate.commented.CommentedConfigurationNode;
 import ninja.leaping.configurate.hocon.HoconConfigurationLoader;
 import ninja.leaping.configurate.loader.ConfigurationLoader;
+import ninja.leaping.configurate.objectmapping.serialize.TypeSerializers;
 import org.slf4j.Logger;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.command.CommandResult;
@@ -27,6 +36,7 @@ import org.spongepowered.api.event.game.state.GameStartedServerEvent;
 import org.spongepowered.api.event.game.state.GameStoppedServerEvent;
 import org.spongepowered.api.plugin.Dependency;
 import org.spongepowered.api.plugin.Plugin;
+import org.spongepowered.api.plugin.PluginContainer;
 import org.spongepowered.api.text.Text;
 
 import java.io.IOException;
@@ -49,6 +59,7 @@ import java.util.Random;
         }
 )
 public class LimeFun {
+    private static LimeFun INSTANCE;
     @Inject @Getter
     private Injector injector;
     @Inject @Getter
@@ -60,10 +71,16 @@ public class LimeFun {
     @Getter
     private final Random random = new Random();
 
+    public LimeFun() {
+        INSTANCE = this;
+    }
+
     @Listener
     public void onGamePreInitialization(GamePreInitializationEvent event) {
         DataManager manager = Sponge.getDataManager();
 
+        registerRegistryModules();
+        registerSerializers();
         initModules();
         availableModules.values().forEach(module -> module.registerData(manager));
     }
@@ -81,19 +98,50 @@ public class LimeFun {
         logger.info("Enabling LimeFun...");
         loadedModules.values().forEach(Module::start);
         logger.info("LimeFun enabled.");
+
+        // TODO: Remove this line to not force instantiation
+        MiningSourceWorldManager.getInstance();
+        int i = 0;
+
+        while(MiningSourceWorldManager.getInstance().getManager(Sponge.getServer().getWorld(Sponge.getServer().getDefaultWorldName()).get()).getDistributorAt(
+
+
+                Vector2i.from(i, 0)).getTotalProduct() <= 0) {
+            i++;
+        }
+
     }
 
     @Listener
     public void onGameStoppedServer(GameStoppedServerEvent event) {
         logger.info("Disabling LimeFun...");
+
         loadedModules.values().forEach(Module::stop);
         Sponge.getEventManager().unregisterPluginListeners(this);
+
+        if(MiningSourceWorldManager.isInstantiated())
+            MiningSourceWorldManager.getInstance().save();
+
         logger.info("LimeFun disabled.");
     }
 
     @Listener
     public void onGameReload(GameReloadEvent event) {
         loadConfig();
+    }
+
+    private void registerRegistryModules() {
+        MiningSourcesRegistryModule miningSourcesRegistryModule = new MiningSourcesRegistryModule();
+
+        miningSourcesRegistryModule.registerDefaults();
+        Sponge.getRegistry().registerModule(MiningSource.class, miningSourcesRegistryModule);
+    }
+
+    private void registerSerializers() {
+        TypeSerializers.getDefaultSerializers()
+                .registerType(TypeToken.of(MiningSourceManager.class), new MiningSourceManagerSerializer());
+        TypeSerializers.getDefaultSerializers()
+                .registerType(TypeToken.of(MiningSourceWorldManager.class), new MiningSourceWorldManagerSerializer());
     }
 
     private void initModules() {
@@ -168,5 +216,18 @@ public class LimeFun {
     public static CustomItemService getCustomItemService() {
         return Sponge.getServiceManager().provide(CustomItemService.class)
                 .orElseThrow(() -> new IllegalStateException("Could not access the CustomItemService."));
+    }
+
+    public Path getConfigDirectory() {
+        return configPath.getParent().resolve(getPluginContainer().getId());
+    }
+
+    public PluginContainer getPluginContainer() {
+        return Sponge.getPluginManager().fromInstance(this)
+                .orElseThrow(() -> new IllegalStateException("Could not access the plugin container."));
+    }
+
+    public static LimeFun getInstance() {
+        return INSTANCE;
     }
 }

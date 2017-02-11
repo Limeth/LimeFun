@@ -12,8 +12,6 @@ import cz.creeper.limefun.LimeFun;
 import cz.creeper.limefun.LimeFunKeys;
 import cz.creeper.limefun.modules.Module;
 import lombok.RequiredArgsConstructor;
-import net.minecraft.init.Items;
-import net.minecraft.item.crafting.CraftingManager;
 import ninja.leaping.configurate.ConfigurationNode;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockSnapshot;
@@ -41,7 +39,6 @@ import org.spongepowered.api.util.blockray.BlockRay;
 import org.spongepowered.api.util.blockray.BlockRayHit;
 import org.spongepowered.api.world.Location;
 import org.spongepowered.api.world.World;
-import org.spongepowered.common.item.inventory.util.ItemStackUtil;
 
 import java.util.List;
 import java.util.Optional;
@@ -116,6 +113,7 @@ public class WateringCanModule implements Module {
     }
 
     private void registerRecipes() {
+        /*
         net.minecraft.item.ItemStack wateringCan = ItemStackUtil.toNative(
                 definition.createItem(Cause.source(plugin).build()).getDataHolder()
         );
@@ -128,6 +126,7 @@ public class WateringCanModule implements Module {
                 " I", "B ",
                 'I', Items.IRON_INGOT,
                 'B', Items.BUCKET);
+        */
     }
 
     private CustomToolDefinition createDefinition() {
