@@ -11,6 +11,7 @@ import cz.creeper.limefun.manager.MiningSourceManagerSerializer;
 import cz.creeper.limefun.manager.MiningSourceWorldManager;
 import cz.creeper.limefun.manager.MiningSourceWorldManagerSerializer;
 import cz.creeper.limefun.modules.Module;
+import cz.creeper.limefun.modules.drill.DrillModule;
 import cz.creeper.limefun.modules.pipe.PipeModule;
 import cz.creeper.limefun.modules.wateringCan.WateringCanModule;
 import cz.creeper.limefun.registry.miningSource.MiningSource;
@@ -148,6 +149,7 @@ public class LimeFun {
         availableModules.clear();
         initModule(new PipeModule(this));
         initModule(new WateringCanModule(this));
+        initModule(new DrillModule(this));
     }
 
     private void initModule(Module module) {
