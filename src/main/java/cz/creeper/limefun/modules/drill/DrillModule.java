@@ -10,16 +10,7 @@ import cz.creeper.customitemlibrary.feature.block.CustomBlock;
 import cz.creeper.customitemlibrary.feature.block.CustomBlockDefinition;
 import cz.creeper.customitemlibrary.feature.block.simple.CorrectToolPredicate;
 import cz.creeper.customitemlibrary.feature.block.simple.SimpleCustomBlock;
-import cz.creeper.customitemlibrary.feature.inventory.simple
-        .AffectCustomSlotListener;
-import cz.creeper.customitemlibrary.feature.inventory.simple.CustomSlot;
-import cz.creeper.customitemlibrary.feature.inventory.simple.GUIBackground;
-import cz.creeper.customitemlibrary.feature.inventory.simple
-        .SimpleCustomInventory;
-import cz.creeper.customitemlibrary.feature.inventory.simple
-        .SimpleCustomInventoryDefinition;
-import cz.creeper.customitemlibrary.feature.inventory.simple
-        .SimpleCustomInventoryDefinitionBuilder;
+import cz.creeper.customitemlibrary.feature.inventory.simple.*;
 import cz.creeper.customitemlibrary.feature.item.CustomItemDefinition;
 import cz.creeper.customitemlibrary.util.Block;
 import cz.creeper.limefun.LimeFun;
@@ -46,6 +37,7 @@ import org.spongepowered.api.item.ItemTypes;
 import org.spongepowered.api.item.inventory.ItemStack;
 import org.spongepowered.api.item.inventory.ItemStackSnapshot;
 import org.spongepowered.api.text.Text;
+import org.spongepowered.api.text.format.TextColors;
 import org.spongepowered.api.world.Chunk;
 import org.spongepowered.api.world.World;
 
@@ -53,6 +45,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 public class DrillModule implements Module {
@@ -182,28 +175,34 @@ public class DrillModule implements Module {
         Block block = customBlock.getBlock();
         World world = block.getWorld().get();
         Chunk chunk = block.getChunk().get();
-        Map<String, Integer> sourceToProductLeft = MiningModule.getInstance()
-                .getMiningSourceWorldManager().getManager(world)
-                .getDistributorAt(chunk).getSourceToProductLeft();
-        List<String> sortedSources = Lists.newLinkedList(sourceToProductLeft.keySet());
+        List<ProductLeft> sourceToProductLeft = MiningModule.getInstance()
+                .getMiningSourceWorldManager().getManager(world).getDistributorAt(chunk)
+                .getSourceToProductLeft().entrySet().stream().map(ProductLeft::new)
+                .collect(Collectors.toList());
 
-        Collections.sort(sortedSources);
+        // Mining source display is limited, prioritize those with the most product available
+        sourceToProductLeft.sort(Collections.reverseOrder());
 
         for(int i = 0; i < 9; i++) {
-            ItemStackSnapshot snapshot;
+            ItemStackSnapshot snapshot = ItemStackSnapshot.NONE;
 
-            if(sortedSources.size() > 0) {
-                String sourceId = sortedSources.remove(0);
-                MiningSource source = Sponge.getRegistry().getType(MiningSource.class, sourceId).get();
-                snapshot = source.getProduct(Math.min(sourceToProductLeft.get(sourceId), 64));
-            } else {
-                snapshot = ItemStackSnapshot.NONE;
+            if(sourceToProductLeft.size() > 0) {
+                ProductLeft productLeft = sourceToProductLeft.remove(0);
+
+                if(productLeft.productLeft > 0) {
+                    snapshot = productLeft.miningSource.getProduct();
+                    snapshot = snapshot.with(Keys.DISPLAY_NAME, Text.of(
+                                TextColors.GRAY,
+                                productLeft.productLeft + "x ",
+                                snapshot.get(Keys.DISPLAY_NAME).orElse(Text.EMPTY)
+                            )).get();
+                }
             }
 
             bottomRow.add(snapshot);
         }
 
-        random.setSeed(block.hashCode());
+        random.setSeed(hashCodeOf(chunk));
         Collections.shuffle(bottomRow, random);
 
         for(int x = 0; x < 9; x++) {
@@ -213,9 +212,30 @@ public class DrillModule implements Module {
         }
     }
 
+    public int hashCodeOf(Chunk chunk) {
+        int result = chunk.getPosition().hashCode();
+        result = 31 * result + chunk.getUniqueId().hashCode();
+        return result;
+    }
+
     public static String getMiningSourceSlotId(int x) {
         Preconditions.checkArgument(x >= 0 && x < 9, "Invalid slot index.");
 
         return "mining_source_" + x;
+    }
+
+    private static class ProductLeft implements Comparable<ProductLeft> {
+        private final MiningSource miningSource;
+        private final int productLeft;
+
+        ProductLeft(Map.Entry<String, Integer> entry) {
+            this.miningSource = Sponge.getRegistry().getType(MiningSource.class, entry.getKey()).get();
+            this.productLeft = entry.getValue();
+        }
+
+        @Override
+        public int compareTo(ProductLeft o) {
+            return Integer.valueOf(productLeft).compareTo(o.productLeft);
+        }
     }
 }

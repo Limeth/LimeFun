@@ -80,8 +80,9 @@ public final class MiningSources {
             @Override
             public double getPrevalenceInChunk(long seed, Vector2i chunk) {
                 BalancedPerlin perlin = getPerlin();
+                int perlinSeed = 31 * Long.valueOf(seed).intValue() + id.hashCode();
 
-                perlin.setSeed(Long.valueOf(seed).intValue());
+                perlin.setSeed(perlinSeed);
 
                 double result = perlin.getValue(chunk.getX(), 0, chunk.getY());
                 result = (result + 1) / 2;
