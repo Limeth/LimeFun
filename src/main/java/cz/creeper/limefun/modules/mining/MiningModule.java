@@ -33,7 +33,9 @@ public class MiningModule implements Module {
     private MiningSourceWorldManager miningSourceWorldManager;
 
     // Copper
-    @Getter private static CustomItemDefinition malachite;
+    @Getter private CustomItemDefinition malachite;
+    @Getter private CustomItemDefinition nativeCopper;
+    @Getter private CustomItemDefinition tetrahedrite;
 
     public MiningModule(LimeFun plugin) {
         this.plugin = plugin;
@@ -78,6 +80,8 @@ public class MiningModule implements Module {
     @Listener
     public void onGamePostInitialization(GamePostInitializationEvent event) {
         malachite = registerOreType("malachite", "Malachite");
+        nativeCopper = registerOreType("native_copper", "Native Copper");
+        tetrahedrite = registerOreType("tetrahedrite", "Tetrahedrite");
     }
 
     private CustomToolDefinition registerOreType(String id, String name) {

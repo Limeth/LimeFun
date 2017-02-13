@@ -30,6 +30,8 @@ public final class MiningSourcesRegistryModule implements CatalogRegistryModule<
     @Override
     public void registerDefaults() {
         register(MiningSources.MALACHITE);
+        register(MiningSources.NATIVE_COPPER);
+        register(MiningSources.TETRAHEDRITE);
     }
 
     private void register(MiningSource miningSource) {
