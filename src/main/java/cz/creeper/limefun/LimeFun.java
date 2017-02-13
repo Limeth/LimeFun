@@ -1,28 +1,20 @@
 package cz.creeper.limefun;
 
-import com.flowpowered.math.vector.Vector2i;
 import com.google.common.collect.Maps;
-import com.google.common.reflect.TypeToken;
 import com.google.inject.Inject;
 import com.google.inject.Injector;
 import cz.creeper.customitemlibrary.CustomItemService;
-import cz.creeper.limefun.manager.MiningSourceManager;
-import cz.creeper.limefun.manager.MiningSourceManagerSerializer;
-import cz.creeper.limefun.manager.MiningSourceWorldManager;
-import cz.creeper.limefun.manager.MiningSourceWorldManagerSerializer;
 import cz.creeper.limefun.modules.Module;
 import cz.creeper.limefun.modules.drill.DrillModule;
+import cz.creeper.limefun.modules.mining.MiningModule;
 import cz.creeper.limefun.modules.pipe.PipeModule;
 import cz.creeper.limefun.modules.wateringCan.WateringCanModule;
-import cz.creeper.limefun.registry.miningSource.MiningSource;
-import cz.creeper.limefun.registry.miningSource.MiningSourcesRegistryModule;
 import lombok.Getter;
 import ninja.leaping.configurate.ConfigurationNode;
 import ninja.leaping.configurate.ConfigurationOptions;
 import ninja.leaping.configurate.commented.CommentedConfigurationNode;
 import ninja.leaping.configurate.hocon.HoconConfigurationLoader;
 import ninja.leaping.configurate.loader.ConfigurationLoader;
-import ninja.leaping.configurate.objectmapping.serialize.TypeSerializers;
 import org.slf4j.Logger;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.command.CommandResult;
@@ -80,8 +72,6 @@ public class LimeFun {
     public void onGamePreInitialization(GamePreInitializationEvent event) {
         DataManager manager = Sponge.getDataManager();
 
-        registerRegistryModules();
-        registerSerializers();
         initModules();
         availableModules.values().forEach(module -> module.registerData(manager));
     }
@@ -99,18 +89,6 @@ public class LimeFun {
         logger.info("Enabling LimeFun...");
         loadedModules.values().forEach(Module::start);
         logger.info("LimeFun enabled.");
-
-        // TODO: Remove this line to not force instantiation
-        MiningSourceWorldManager.getInstance();
-        int i = 0;
-
-        while(MiningSourceWorldManager.getInstance().getManager(Sponge.getServer().getWorld(Sponge.getServer().getDefaultWorldName()).get()).getDistributorAt(
-
-
-                Vector2i.from(i, 0)).getTotalProduct() <= 0) {
-            i++;
-        }
-
     }
 
     @Listener
@@ -120,9 +98,6 @@ public class LimeFun {
         loadedModules.values().forEach(Module::stop);
         Sponge.getEventManager().unregisterPluginListeners(this);
 
-        if(MiningSourceWorldManager.isInstantiated())
-            MiningSourceWorldManager.getInstance().save();
-
         logger.info("LimeFun disabled.");
     }
 
@@ -131,22 +106,9 @@ public class LimeFun {
         loadConfig();
     }
 
-    private void registerRegistryModules() {
-        MiningSourcesRegistryModule miningSourcesRegistryModule = new MiningSourcesRegistryModule();
-
-        miningSourcesRegistryModule.registerDefaults();
-        Sponge.getRegistry().registerModule(MiningSource.class, miningSourcesRegistryModule);
-    }
-
-    private void registerSerializers() {
-        TypeSerializers.getDefaultSerializers()
-                .registerType(TypeToken.of(MiningSourceManager.class), new MiningSourceManagerSerializer());
-        TypeSerializers.getDefaultSerializers()
-                .registerType(TypeToken.of(MiningSourceWorldManager.class), new MiningSourceWorldManagerSerializer());
-    }
-
     private void initModules() {
         availableModules.clear();
+        initModule(new MiningModule(this));
         initModule(new PipeModule(this));
         initModule(new WateringCanModule(this));
         initModule(new DrillModule(this));

@@ -29,7 +29,7 @@ public final class MiningSourcesRegistryModule implements CatalogRegistryModule<
 
     @Override
     public void registerDefaults() {
-        register(MiningSources.CHALCOPYRITE);
+        register(MiningSources.MALACHITE);
     }
 
     private void register(MiningSource miningSource) {

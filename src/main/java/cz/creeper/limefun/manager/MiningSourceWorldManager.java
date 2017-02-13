@@ -25,8 +25,6 @@ import java.util.stream.Collectors;
 @ConfigSerializable
 public class MiningSourceWorldManager {
 
-    private static MiningSourceWorldManager INSTANCE;
-
     @Setting("worlds")
     private final Map<UUID, MiningSourceManager> worldToManager;
 
@@ -47,12 +45,12 @@ public class MiningSourceWorldManager {
         return ImmutableMap.copyOf(worldToManager);
     }
 
-    private static MiningSourceWorldManager load() {
+    public static MiningSourceWorldManager load() {
         try {
             HoconConfigurationLoader loader = getConfigurationLoader();
             CommentedConfigurationNode root = loader.load(ConfigurationOptions.defaults());
 
-            return INSTANCE = root.getNode("managers").getValue(TypeToken.of(MiningSourceWorldManager.class),
+            return root.getNode("managers").getValue(TypeToken.of(MiningSourceWorldManager.class),
                     (Supplier<MiningSourceWorldManager>) MiningSourceWorldManager::new);
         } catch (ObjectMappingException | IOException e) {
             throw new RuntimeException(e);
@@ -88,14 +86,6 @@ public class MiningSourceWorldManager {
 
     public static Path getConfigurationFile() {
         return LimeFun.getInstance().getConfigDirectory().resolve("miningSources");
-    }
-
-    public static MiningSourceWorldManager getInstance() {
-        return INSTANCE != null ? INSTANCE : load();
-    }
-
-    public static boolean isInstantiated() {
-        return INSTANCE != null;
     }
 
 }
