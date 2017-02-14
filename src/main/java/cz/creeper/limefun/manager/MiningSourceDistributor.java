@@ -107,7 +107,7 @@ public class MiningSourceDistributor {
     }
 
     public Map<String, Integer> getSourceToProductLeft() {
-        return ImmutableMap.copyOf(sourceToProductLeft);
+        return ImmutableMap.copyOf(updateSourceToProductLeft());
     }
 
     private long updateTotalProduct() {
