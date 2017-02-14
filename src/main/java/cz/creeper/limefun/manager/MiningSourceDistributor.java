@@ -55,9 +55,6 @@ public class MiningSourceDistributor {
             double currentProductPortion = (double) currentProduct / (double) totalProduct;
 
             if(currentProductPortion >= chosen) {
-                entry.setValue(currentProduct - 1);
-                nextChosenProduct();
-
                 return Optional.of(Sponge.getRegistry()
                         .getType(MiningSource.class, entry.getKey())
                         .orElseThrow(() -> new IllegalStateException(
@@ -84,11 +81,12 @@ public class MiningSourceDistributor {
             String nextProductId = nextProduct.get().getId();
             Map<String, Integer> sourceToProductLeft = updateSourceToProductLeft();
 
-            sourceToProductLeft.put(nextProductId, sourceToProductLeft.get(nextProductId) - 1);
-        }
+            if(totalProduct != null)
+                totalProduct--;
 
-        if(totalProduct != null)
-            totalProduct--;
+            sourceToProductLeft.put(nextProductId, sourceToProductLeft.get(nextProductId) - 1);
+            nextChosenProduct();
+        }
 
         return nextProduct;
     }

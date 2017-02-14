@@ -41,10 +41,7 @@ import org.spongepowered.api.text.format.TextColors;
 import org.spongepowered.api.world.Chunk;
 import org.spongepowered.api.world.World;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
@@ -79,13 +76,20 @@ public class DrillModule implements Module {
         DataHolder dataHolder = customBlock.getDataHolder();
         CustomInventoryData data = electricDrillInventoryDefinition.getCustomInventoryData(dataHolder);
         Block block = customBlock.getBlock();
-        World world = block.getWorld().get();
-        MiningSourceManager miningSourceManager = MiningModule.getInstance().getMiningSourceWorldManager().getManager(world);
-        MiningSourceDistributor distributor = miningSourceManager.getDistributorAt(block.getChunk().get());
-        Map<String, ItemStackSnapshot> slotIdToItemStack = data.getSlotIdToItemStack();
-        ItemStackSnapshot output = slotIdToItemStack.get("output");
+        Optional<World> world = block.getWorld();
+        Optional<Chunk> chunk = block.getChunk();
 
-        if(output == ItemStackSnapshot.NONE) {
+        if(!world.isPresent() || !chunk.isPresent())
+            return;
+
+        MiningSourceManager miningSourceManager = MiningModule.getInstance()
+                .getMiningSourceWorldManager().getManager(world.get());
+        MiningSourceDistributor distributor = miningSourceManager.getDistributorAt(chunk.get());
+        Map<String, ItemStackSnapshot> slotIdToItemStack = data.getSlotIdToItemStack();
+        ItemStackSnapshot output = Optional.ofNullable(slotIdToItemStack.get("output"))
+                .orElse(ItemStackSnapshot.NONE);
+
+        if(output.getType() == ItemTypes.NONE || output.getCount() <= 0) {
             distributor.pollNextProduct().ifPresent(nextProduct -> {
                 slotIdToItemStack.put("output", nextProduct.getProduct());
                 electricDrillInventoryDefinition.setCustomInventoryData(dataHolder, data);
