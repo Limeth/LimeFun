@@ -52,7 +52,7 @@ repositories {
 dependencies {
     // SpongeCommon from https://repo.spongepowered.org/maven/org/spongepowered/spongecommon/
     compile 'org.spongepowered:spongecommon:6.0.0-SNAPSHOT:dev'
-    compile 'com.github.Limeth:CustomItemLibrary:v0.5.4'
+    compile 'com.github.Limeth:CustomItemLibrary:v0.5.6'
     compileOnly "org.projectlombok:lombok:1.16.14"
 }
 

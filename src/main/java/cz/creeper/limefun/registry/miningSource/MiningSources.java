@@ -22,7 +22,7 @@ public final class MiningSources {
     public static final MiningSource MALACHITE = miningSourceBuilder()
             .id("malachite")
             .name("Malachite")
-            .threshold(0.53)
+            .threshold(0.51)
             .maxProductAmountPerChunk(1024 * 1024)
             .definitionProvider(MiningModule::getMalachite)
             .build();
@@ -30,7 +30,7 @@ public final class MiningSources {
     public static final MiningSource NATIVE_COPPER = miningSourceBuilder()
             .id("native_copper")
             .name("Native Copper")
-            .threshold(0.53)
+            .threshold(0.51)
             .maxProductAmountPerChunk(1024 * 1024)
             .definitionProvider(MiningModule::getNativeCopper)
             .build();
@@ -38,7 +38,7 @@ public final class MiningSources {
     public static final MiningSource TETRAHEDRITE = miningSourceBuilder()
             .id("tetrahedrite")
             .name("Tetrahedrite")
-            .threshold(0.53)
+            .threshold(0.51)
             .maxProductAmountPerChunk(1024 * 1024)
             .definitionProvider(MiningModule::getTetrahedrite)
             .build();

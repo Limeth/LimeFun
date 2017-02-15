@@ -3,14 +3,19 @@ package cz.creeper.limefun.modules.drill;
 import com.flowpowered.math.vector.Vector2i;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import cz.creeper.customitemlibrary.data.mutable.CustomInventoryData;
+import com.google.common.collect.Maps;
 import cz.creeper.customitemlibrary.feature.CustomFeatureDefinition;
 import cz.creeper.customitemlibrary.feature.TextureId;
 import cz.creeper.customitemlibrary.feature.block.CustomBlock;
 import cz.creeper.customitemlibrary.feature.block.CustomBlockDefinition;
 import cz.creeper.customitemlibrary.feature.block.simple.CorrectToolPredicate;
 import cz.creeper.customitemlibrary.feature.block.simple.SimpleCustomBlock;
-import cz.creeper.customitemlibrary.feature.inventory.simple.*;
+import cz.creeper.customitemlibrary.feature.inventory.simple.AffectCustomSlotListener;
+import cz.creeper.customitemlibrary.feature.inventory.simple.CustomSlot;
+import cz.creeper.customitemlibrary.feature.inventory.simple.GUIBackground;
+import cz.creeper.customitemlibrary.feature.inventory.simple.SimpleCustomInventory;
+import cz.creeper.customitemlibrary.feature.inventory.simple.SimpleCustomInventoryDefinition;
+import cz.creeper.customitemlibrary.feature.inventory.simple.SimpleCustomInventoryDefinitionBuilder;
 import cz.creeper.customitemlibrary.feature.item.CustomItemDefinition;
 import cz.creeper.customitemlibrary.util.Block;
 import cz.creeper.limefun.LimeFun;
@@ -24,7 +29,6 @@ import ninja.leaping.configurate.ConfigurationNode;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockSnapshot;
 import org.spongepowered.api.block.BlockTypes;
-import org.spongepowered.api.data.DataHolder;
 import org.spongepowered.api.data.DataManager;
 import org.spongepowered.api.data.key.Keys;
 import org.spongepowered.api.entity.living.player.Player;
@@ -41,7 +45,11 @@ import org.spongepowered.api.text.format.TextColors;
 import org.spongepowered.api.world.Chunk;
 import org.spongepowered.api.world.World;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Random;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
@@ -49,6 +57,7 @@ public class DrillModule implements Module {
     public static CustomBlockDefinition electricDrillBlockDefinition;
     public static CustomItemDefinition electricDrillMaterialDefinition;
     public static SimpleCustomInventoryDefinition electricDrillInventoryDefinition;
+    private final Map<Block, SimpleCustomInventory> electricDrillToInventory = Maps.newHashMap();
     private final Random random = new Random();
     private final LimeFun plugin;
 
@@ -73,28 +82,40 @@ public class DrillModule implements Module {
     }
 
     private void onUpdate(SimpleCustomBlock customBlock) {
-        DataHolder dataHolder = customBlock.getDataHolder();
-        CustomInventoryData data = electricDrillInventoryDefinition.getCustomInventoryData(dataHolder);
         Block block = customBlock.getBlock();
         Optional<World> world = block.getWorld();
         Optional<Chunk> chunk = block.getChunk();
 
-        if(!world.isPresent() || !chunk.isPresent())
+        if (!world.isPresent() || !chunk.isPresent())
             return;
 
         MiningSourceManager miningSourceManager = MiningModule.getInstance()
                 .getMiningSourceWorldManager().getManager(world.get());
         MiningSourceDistributor distributor = miningSourceManager.getDistributorAt(chunk.get());
-        Map<String, ItemStackSnapshot> slotIdToItemStack = data.getSlotIdToItemStack();
-        ItemStackSnapshot output = Optional.ofNullable(slotIdToItemStack.get("output"))
-                .orElse(ItemStackSnapshot.NONE);
+        CustomSlot outputSlot = getOutputSlot(customBlock);
+        ItemStack output = outputSlot.getItemStack().orElse(null);
 
-        if(output.getType() == ItemTypes.NONE || output.getCount() <= 0) {
+        if (output == null || output.getItem() == ItemTypes.NONE || output.getQuantity() <= 0) {
             distributor.pollNextProduct().ifPresent(nextProduct -> {
-                slotIdToItemStack.put("output", nextProduct.getProduct());
-                electricDrillInventoryDefinition.setCustomInventoryData(dataHolder, data);
+                SimpleCustomInventory inventory = electricDrillToInventory.get(block);
+
+                outputSlot.setItemStack(nextProduct.getProduct().createStack());
+
+                if(inventory != null) {
+                    populateBottomRow(block, inventory);
+                }
             });
         }
+    }
+
+    private CustomSlot getOutputSlot(SimpleCustomBlock block) {
+        return Optional.ofNullable(electricDrillToInventory.get(block.getBlock()))
+                .map(inventory -> inventory.getCustomSlot("output"))
+                .orElseGet(() -> electricDrillInventoryDefinition.getCustomSlot(
+                        block.getDataHolder(),
+                        "output"
+                ))
+                .orElseThrow(() -> new IllegalStateException("Could not access the output slot."));
     }
 
     @Listener
@@ -174,32 +195,50 @@ public class DrillModule implements Module {
     }
 
     private void openInventory(CustomBlock customBlock, Player player, Cause cause) {
-        SimpleCustomInventory inventory = electricDrillInventoryDefinition.create(customBlock.getDataHolder());
-        List<ItemStackSnapshot> bottomRow = Lists.newArrayListWithCapacity(9);
         Block block = customBlock.getBlock();
+        SimpleCustomInventory inventory = electricDrillToInventory.computeIfAbsent(block, _block -> {
+            SimpleCustomInventory inv = electricDrillInventoryDefinition
+                    .create(customBlock.getDataHolder());
+
+            populateBottomRow(block, inv);
+
+            return inv;
+        });
+
+        inventory.open(player, cause);
+    }
+
+    private void populateBottomRow(Block block, SimpleCustomInventory inventory) {
+        List<ItemStackSnapshot> bottomRow =
+                Lists.newArrayListWithCapacity(9);
         World world = block.getWorld().get();
         Chunk chunk = block.getChunk().get();
-        List<ProductLeft> sourceToProductLeft = MiningModule.getInstance()
-                .getMiningSourceWorldManager().getManager(world).getDistributorAt(chunk)
-                .getSourceToProductLeft().entrySet().stream().map(ProductLeft::new)
-                .collect(Collectors.toList());
+        MiningSourceDistributor distributor = MiningModule.getInstance()
+                .getMiningSourceWorldManager().getManager(world)
+                .getDistributorAt(chunk);
+        List<ProductLeft> sourceToProductLeft =
+                distributor.getSourceToProductLeft()
+                        .entrySet().stream().map(ProductLeft::new)
+                        .collect(Collectors.toList());
 
         // Mining source display is limited, prioritize those with the most product available
+
         sourceToProductLeft.sort(Collections.reverseOrder());
 
-        for(int i = 0; i < 9; i++) {
+        for (int i = 0; i < 9; i++) {
             ItemStackSnapshot snapshot = ItemStackSnapshot.NONE;
 
-            if(sourceToProductLeft.size() > 0) {
+            if (sourceToProductLeft.size() > 0) {
                 ProductLeft productLeft = sourceToProductLeft.remove(0);
 
-                if(productLeft.productLeft > 0) {
+                if (productLeft.productLeft > 0) {
                     snapshot = productLeft.miningSource.getProduct();
                     snapshot = snapshot.with(Keys.DISPLAY_NAME, Text.of(
-                                TextColors.GRAY,
-                                productLeft.productLeft + "x ",
-                                snapshot.get(Keys.DISPLAY_NAME).orElse(Text.EMPTY)
-                            )).get();
+                            TextColors.GRAY,
+                            productLeft.productLeft + "x ",
+                            snapshot.get(Keys.DISPLAY_NAME)
+                                    .orElse(Text.EMPTY)
+                    )).get();
                 }
             }
 
@@ -209,13 +248,12 @@ public class DrillModule implements Module {
         random.setSeed(hashCodeOf(chunk));
         Collections.shuffle(bottomRow, random);
 
-        for(int x = 0; x < 9; x++) {
-            CustomSlot slot = inventory.getCustomSlot(getMiningSourceSlotId(x)).get();
+        for (int x = 0; x < 9; x++) {
+            CustomSlot slot =
+                    inventory.getCustomSlot(getMiningSourceSlotId(x)).get();
 
             slot.setItemStack(bottomRow.get(x).createStack());
         }
-        
-        inventory.open(player, cause);
     }
 
     public int hashCodeOf(Chunk chunk) {
