@@ -174,7 +174,7 @@ public class DrillModule implements Module {
     }
 
     private void openInventory(CustomBlock customBlock, Player player, Cause cause) {
-        SimpleCustomInventory inventory = electricDrillInventoryDefinition.open(customBlock.getDataHolder(), player, cause);
+        SimpleCustomInventory inventory = electricDrillInventoryDefinition.create(customBlock.getDataHolder());
         List<ItemStackSnapshot> bottomRow = Lists.newArrayListWithCapacity(9);
         Block block = customBlock.getBlock();
         World world = block.getWorld().get();
@@ -214,6 +214,8 @@ public class DrillModule implements Module {
 
             slot.setItemStack(bottomRow.get(x).createStack());
         }
+        
+        inventory.open(player, cause);
     }
 
     public int hashCodeOf(Chunk chunk) {

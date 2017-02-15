@@ -47,7 +47,7 @@ import java.util.Random;
         dependencies = {
                 @Dependency(
                         id = "customitemlibrary",
-                        version = "[0.2,)"
+                        version = "[0.5.4,)"
                 )
         }
 )
